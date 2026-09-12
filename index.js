@@ -1,3 +1,15 @@
+const http = require("http");
+
+const PORT = process.env.PORT || 3000;
+
+http.createServer((req, res) => {
+    res.writeHead(200);
+    res.end("Discord bot is running!");
+}).listen(PORT, () => {
+    console.log(`🌐 Web server ${PORT} portunda çalışıyor.`);
+});
+
+
 const {
     Client,
     GatewayIntentBits,
