@@ -1,3 +1,4 @@
+
 const http = require("http");
 
 const PORT = process.env.PORT || 3000;
@@ -27,10 +28,54 @@ const config = require("./config.js");
 
 
 // =====================================================
-// CLIENT
+// 📁 CASE-INSENSITIVE KLASÖR BULUCU
+// Render Linux olduğu için Commands/commands farkını çözer
+// =====================================================
+
+function findFolder(folderNames) {
+
+    for (const folderName of folderNames) {
+
+        const exactPath =
+            path.join(__dirname, folderName);
+
+        if (fs.existsSync(exactPath)) {
+            return exactPath;
+        }
+    }
+
+    // Büyük/küçük harf farkını kontrol et
+    const rootItems = fs.readdirSync(__dirname);
+
+    const found = rootItems.find(item => {
+
+        const fullPath =
+            path.join(__dirname, item);
+
+        return (
+            fs.statSync(fullPath).isDirectory() &&
+            folderNames.some(
+                name =>
+                    item.toLowerCase() ===
+                    name.toLowerCase()
+            )
+        );
+    });
+
+    if (found) {
+        return path.join(__dirname, found);
+    }
+
+    return null;
+}
+
+
+// =====================================================
+// 🤖 CLIENT
 // =====================================================
 
 const client = new Client({
+
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
@@ -38,56 +83,110 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildVoiceStates
     ]
+
 });
 
 
 // =====================================================
-// KOMUTLAR
+// 📦 KOMUT SİSTEMİ
 // =====================================================
 
 client.commands = new Collection();
 
 const commands = [];
 
-const commandsPath =
-    path.join(__dirname, "Commands");
 
-if (!fs.existsSync(commandsPath)) {
-    fs.mkdirSync(commandsPath, {
-        recursive: true
-    });
+// Commands / commands
+let commandsPath =
+    findFolder([
+        "Commands",
+        "commands"
+    ]);
+
+
+// Klasör yoksa oluştur
+if (!commandsPath) {
+
+    commandsPath =
+        path.join(__dirname, "Commands");
+
+    fs.mkdirSync(
+        commandsPath,
+        {
+            recursive: true
+        }
+    );
+
+    console.log(
+        "⚠️ Commands klasörü bulunamadı, oluşturuldu."
+    );
 }
 
-const commandFiles = fs
-    .readdirSync(commandsPath)
-    .filter(file => file.endsWith(".js"));
+
+console.log(
+    `📂 Komut klasörü: ${commandsPath}`
+);
+
+
+const commandFiles =
+    fs.readdirSync(commandsPath)
+        .filter(
+            file =>
+                file.toLowerCase().endsWith(".js")
+        );
+
+
+console.log(
+    `📦 ${commandFiles.length} adet komut dosyası bulundu.`
+);
+
+
+// =====================================================
+// 🔄 KOMUTLARI YÜKLE
+// =====================================================
 
 for (const file of commandFiles) {
 
     const filePath =
-        path.join(commandsPath, file);
+        path.join(
+            commandsPath,
+            file
+        );
 
     try {
+
+        // Cache temizle
+        delete require.cache[
+            require.resolve(filePath)
+        ];
 
         const command =
             require(filePath);
 
+
         if (
+            command &&
             command.data &&
-            command.execute
+            typeof command.execute === "function"
         ) {
 
+            const commandName =
+                command.data.name;
+
+
             client.commands.set(
-                command.data.name,
+                commandName,
                 command
             );
+
 
             commands.push(
                 command.data.toJSON()
             );
 
+
             console.log(
-                `✅ Komut yüklendi: /${command.data.name}`
+                `✅ Komut yüklendi: /${commandName}`
             );
 
         } else {
@@ -95,14 +194,17 @@ for (const file of commandFiles) {
             console.log(
                 `⚠️ Hatalı komut dosyası: ${file}`
             );
+
         }
 
     } catch (error) {
 
         console.error(
-            `❌ ${file} yüklenemedi:`,
-            error
+            `❌ ${file} yüklenemedi:`
         );
+
+        console.error(error);
+
     }
 }
 
@@ -111,30 +213,77 @@ for (const file of commandFiles) {
 // 🎯 EVENT SİSTEMİ
 // =====================================================
 
-const eventsPath =
-    path.join(__dirname, "Events");
+let eventsPath =
+    findFolder([
+        "Events",
+        "events"
+    ]);
 
-if (!fs.existsSync(eventsPath)) {
-    fs.mkdirSync(eventsPath, {
-        recursive: true
-    });
+
+if (!eventsPath) {
+
+    eventsPath =
+        path.join(
+            __dirname,
+            "Events"
+        );
+
+    fs.mkdirSync(
+        eventsPath,
+        {
+            recursive: true
+        }
+    );
+
+    console.log(
+        "⚠️ Events klasörü bulunamadı, oluşturuldu."
+    );
+
 }
 
-const eventFiles = fs
-    .readdirSync(eventsPath)
-    .filter(file => file.endsWith(".js"));
+
+console.log(
+    `📂 Event klasörü: ${eventsPath}`
+);
+
+
+const eventFiles =
+    fs.readdirSync(eventsPath)
+        .filter(
+            file =>
+                file.toLowerCase().endsWith(".js")
+        );
+
+
+console.log(
+    `🎯 ${eventFiles.length} adet event dosyası bulundu.`
+);
+
+
+// =====================================================
+// 🔄 EVENTLERİ YÜKLE
+// =====================================================
 
 for (const file of eventFiles) {
 
     const filePath =
-        path.join(eventsPath, file);
+        path.join(
+            eventsPath,
+            file
+        );
 
     try {
+
+        delete require.cache[
+            require.resolve(filePath)
+        ];
 
         const event =
             require(filePath);
 
+
         if (
+            event &&
             typeof event.register === "function"
         ) {
 
@@ -149,14 +298,17 @@ for (const file of eventFiles) {
             console.log(
                 `⚠️ Event formatı hatalı: ${file}`
             );
+
         }
 
     } catch (error) {
 
         console.error(
-            `❌ ${file} event'i yüklenemedi:`,
-            error
+            `❌ ${file} event'i yüklenemedi:`
         );
+
+        console.error(error);
+
     }
 }
 
@@ -166,13 +318,11 @@ for (const file of eventFiles) {
 // =====================================================
 
 const dataDir =
-    path.join(__dirname, "data");
-
-const afkFile =
     path.join(
-        dataDir,
-        "afk.json"
+        __dirname,
+        "data"
     );
+
 
 if (!fs.existsSync(dataDir)) {
 
@@ -182,7 +332,16 @@ if (!fs.existsSync(dataDir)) {
             recursive: true
         }
     );
+
 }
+
+
+const afkFile =
+    path.join(
+        dataDir,
+        "afk.json"
+    );
+
 
 if (!fs.existsSync(afkFile)) {
 
@@ -191,11 +350,12 @@ if (!fs.existsSync(afkFile)) {
         "{}",
         "utf8"
     );
+
 }
 
 
 // =====================================================
-// AFK VERİLERİNİ OKU
+// 📖 AFK OKU
 // =====================================================
 
 function loadAfkData() {
@@ -218,12 +378,14 @@ function loadAfkData() {
         );
 
         return {};
+
     }
+
 }
 
 
 // =====================================================
-// AFK VERİLERİNİ KAYDET
+// 💾 AFK KAYDET
 // =====================================================
 
 function saveAfkData(data) {
@@ -246,12 +408,14 @@ function saveAfkData(data) {
             "❌ AFK verisi kaydedilemedi:",
             error
         );
+
     }
+
 }
 
 
 // =====================================================
-// AFK SÜRESİ
+// ⏱️ AFK SÜRESİ
 // =====================================================
 
 function formatAfkDuration(ms) {
@@ -261,30 +425,38 @@ function formatAfkDuration(ms) {
             ms / 1000
         );
 
+
     if (seconds < 60) {
 
         return `${seconds} saniye`;
+
     }
+
 
     const minutes =
         Math.floor(
             seconds / 60
         );
 
+
     if (minutes < 60) {
 
         return `${minutes} dakika`;
+
     }
+
 
     const hours =
         Math.floor(
             minutes / 60
         );
 
+
     if (hours < 24) {
 
         const remainingMinutes =
             minutes % 60;
+
 
         if (remainingMinutes > 0) {
 
@@ -292,18 +464,24 @@ function formatAfkDuration(ms) {
                 `${hours} saat ` +
                 `${remainingMinutes} dakika`
             );
+
         }
 
+
         return `${hours} saat`;
+
     }
+
 
     const days =
         Math.floor(
             hours / 24
         );
 
+
     const remainingHours =
         hours % 24;
+
 
     if (remainingHours > 0) {
 
@@ -311,14 +489,17 @@ function formatAfkDuration(ms) {
             `${days} gün ` +
             `${remainingHours} saat`
         );
+
     }
 
+
     return `${days} gün`;
+
 }
 
 
 // =====================================================
-// AFK BİLDİRİM COOLDOWN
+// 💤 AFK COOLDOWN
 // =====================================================
 
 const afkCooldown =
@@ -346,15 +527,17 @@ client.on(
                 return;
             }
 
+
             const afkData =
                 loadAfkData();
+
 
             const authorId =
                 message.author.id;
 
 
             // =============================================
-            // 👋 KİŞİ AFK İKEN MESAJ ATTI
+            // 👋 KENDİ AFK'SINI KAPAT
             // =============================================
 
             if (afkData[authorId]) {
@@ -362,17 +545,20 @@ client.on(
                 const afkInfo =
                     afkData[authorId];
 
+
                 delete afkData[authorId];
 
                 saveAfkData(
                     afkData
                 );
 
+
                 const duration =
                     formatAfkDuration(
                         Date.now() -
                         afkInfo.timestamp
                     );
+
 
                 const embed =
                     new EmbedBuilder()
@@ -384,40 +570,38 @@ client.on(
                         )
                         .addFields(
                             {
-                                name:
-                                    "⏱️ AFK Süresi",
-                                value:
-                                    duration,
+                                name: "⏱️ AFK Süresi",
+                                value: duration,
                                 inline: true
                             },
                             {
-                                name:
-                                    "🌐 Durum",
-                                value:
-                                    "Global AFK kapatıldı",
+                                name: "🌐 Durum",
+                                value: "Global AFK kapatıldı",
                                 inline: true
                             }
                         )
                         .setTimestamp();
 
+
                 await message.reply({
-                    embeds: [
-                        embed
-                    ]
+                    embeds: [embed]
                 }).catch(() => {});
+
 
                 return;
             }
 
 
             // =============================================
-            // ETİKET YOKSA
+            // ETİKET YOK
             // =============================================
 
             if (
                 message.mentions.users.size === 0
             ) {
+
                 return;
+
             }
 
 
@@ -427,6 +611,7 @@ client.on(
 
             const mentionedAfk = [];
 
+
             for (
                 const user
                 of message.mentions.users.values()
@@ -435,21 +620,26 @@ client.on(
                 const afkInfo =
                     afkData[user.id];
 
+
                 if (!afkInfo) {
                     continue;
                 }
+
 
                 mentionedAfk.push({
                     user,
                     info: afkInfo
                 });
+
             }
 
 
             if (
                 mentionedAfk.length === 0
             ) {
+
                 return;
+
             }
 
 
@@ -460,10 +650,12 @@ client.on(
             const cooldownKey =
                 `${message.guild.id}:${authorId}`;
 
+
             const lastMessage =
                 afkCooldown.get(
                     cooldownKey
                 );
+
 
             if (
                 lastMessage &&
@@ -473,18 +665,23 @@ client.on(
             ) {
 
                 return;
+
             }
+
 
             afkCooldown.set(
                 cooldownKey,
                 Date.now()
             );
 
+
             setTimeout(
                 () => {
+
                     afkCooldown.delete(
                         cooldownKey
                     );
+
                 },
                 AFK_COOLDOWN
             );
@@ -509,11 +706,13 @@ client.on(
                                         item.info.timestamp
                                     );
 
+
                                 const startTime =
                                     Math.floor(
                                         item.info.timestamp /
                                         1000
                                     );
+
 
                                 return (
                                     `${item.user} şu anda **AFK**.\n` +
@@ -531,11 +730,11 @@ client.on(
                     })
                     .setTimestamp();
 
+
             await message.reply({
-                embeds: [
-                    embed
-                ]
+                embeds: [embed]
             }).catch(() => {});
+
 
         } catch (error) {
 
@@ -543,99 +742,200 @@ client.on(
                 "❌ AFK sistemi hatası:",
                 error
             );
+
         }
+
     }
 );
 
+
 // =====================================================
-// INTERACTION HANDLER
+// 🎮 TEK INTERACTION SİSTEMİ
 // =====================================================
 
-client.on("interactionCreate", async (interaction) => {
+client.on(
+    "interactionCreate",
+    async interaction => {
 
-    try {
+        try {
 
-        // =============================================
-        // SLASH COMMAND
-        // =============================================
+            // =================================================
+            // 🔘 BUTTON / MODAL / SELECT
+            // =================================================
 
-        if (interaction.isChatInputCommand()) {
+            if (
+                interaction.isButton() ||
+                interaction.isModalSubmit() ||
+                interaction.isStringSelectMenu()
+            ) {
 
-            const command =
-                client.commands.get(interaction.commandName);
+                // =============================================
+                // YETKİLİ BAŞVURU
+                // =============================================
 
-            if (!command) {
-                console.log(
-                    `❌ Komut bulunamadı: ${interaction.commandName}`
-                );
+                const customId =
+                    interaction.customId || "";
+
+
+                const isYetkiliInteraction =
+                    customId === "yetkili_basvuru_ac" ||
+                    customId === "yetkili_basvuru_modal" ||
+                    customId.startsWith("yetkili_kabul_") ||
+                    customId.startsWith("yetkili_red_");
+
+
+                if (isYetkiliInteraction) {
+
+                    const yetkiliCommand =
+                        client.commands.get(
+                            "yetkilibasvuru"
+                        );
+
+
+                    if (
+                        yetkiliCommand &&
+                        typeof yetkiliCommand.handleInteraction ===
+                        "function"
+                    ) {
+
+                        await yetkiliCommand.handleInteraction(
+                            interaction
+                        );
+
+                    }
+
+                    return;
+                }
+
+
+                // =============================================
+                // DİĞER KOMUTLARIN BUTTON / SELECT / MODAL
+                // =============================================
+
+                for (
+                    const command
+                    of client.commands.values()
+                ) {
+
+                    if (
+                        typeof command.handleInteraction !==
+                        "function"
+                    ) {
+
+                        continue;
+
+                    }
+
+
+                    const handled =
+                        await command.handleInteraction(
+                            interaction
+                        );
+
+
+                    if (handled) {
+                        return;
+                    }
+
+                }
+
+
                 return;
             }
 
-            await command.execute(interaction);
 
-            return;
-        }
+            // =================================================
+            // SLASH COMMAND
+            // =================================================
 
-        // =============================================
-        // BUTTON / SELECT MENU
-        // =============================================
+            if (
+                !interaction.isChatInputCommand()
+            ) {
 
-        if (
-            interaction.isButton() ||
-            interaction.isStringSelectMenu()
-        ) {
+                return;
 
-            for (const command of client.commands.values()) {
-
-                if (
-                    typeof command.handleInteraction !== "function"
-                ) {
-                    continue;
-                }
-
-                const handled =
-                    await command.handleInteraction(interaction);
-
-                if (handled) {
-                    return;
-                }
             }
 
-        }
 
-    } catch (error) {
+            const command =
+                client.commands.get(
+                    interaction.commandName
+                );
 
-        console.error(
-            "❌ Interaction hatası:",
-            error
-        );
 
-        if (
-            interaction.replied ||
-            interaction.deferred
-        ) {
+            if (!command) {
 
-            await interaction.followUp({
-                content:
-                    "❌ İşlem sırasında bir hata oluştu.",
-                ephemeral: true
-            }).catch(() => {});
+                console.log(
+                    `❌ Komut bulunamadı: /${interaction.commandName}`
+                );
 
-        } else {
 
-            await interaction.reply({
-                content:
-                    "❌ İşlem sırasında bir hata oluştu.",
-                ephemeral: true
-            }).catch(() => {});
+                if (!interaction.replied) {
+
+                    await interaction.reply({
+                        content:
+                            "❌ Bu komut bot tarafından yüklenmemiş.",
+                        ephemeral: true
+                    }).catch(() => {});
+
+                }
+
+                return;
+            }
+
+
+            console.log(
+                `▶️ Komut çalıştırılıyor: /${interaction.commandName}`
+            );
+
+
+            await command.execute(
+                interaction,
+                client
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "❌ Interaction hatası:",
+                error
+            );
+
+
+            try {
+
+                if (
+                    interaction.replied ||
+                    interaction.deferred
+                ) {
+
+                    await interaction.followUp({
+                        content:
+                            "❌ İşlem sırasında bir hata oluştu.",
+                        ephemeral: true
+                    }).catch(() => {});
+
+                } else {
+
+                    await interaction.reply({
+                        content:
+                            "❌ İşlem sırasında bir hata oluştu.",
+                        ephemeral: true
+                    }).catch(() => {});
+
+                }
+
+            } catch {}
 
         }
 
     }
+);
 
-});
+
 // =====================================================
-// READY
+// 🚀 READY
 // =====================================================
 
 client.once(
@@ -668,22 +968,26 @@ client.once(
 
 
         client.user.setPresence({
+
             activities: [
                 {
                     name:
                         "Dünyanın en tatlı botu 🌸",
+
                     type:
                         ActivityType.Watching
                 }
             ],
+
             status:
                 "online"
+
         });
 
 
-        // =============================================
-        // SLASH KOMUTLARI
-        // =============================================
+        // =================================================
+        // SLASH KOMUTLARINI DISCORD'A YÜKLE
+        // =================================================
 
         try {
 
@@ -694,149 +998,99 @@ client.once(
                     config.token
                 );
 
+
             console.log(
                 "🔄 Slash komutları yükleniyor..."
             );
 
+
+            // =================================================
+            // SUNUCU ID VARSA → SUNUCUYA ÖZEL KAYIT
+            // YOKSA → GLOBAL KAYIT
+            // =================================================
+
+            const guildId =
+                process.env.GUILD_ID ||
+                config.guildId;
+
+
+            let route;
+
+
+            if (guildId) {
+
+                route =
+                    Routes.applicationGuildCommands(
+                        client.user.id,
+                        guildId
+                    );
+
+
+                console.log(
+                    `🎯 Sunucuya özel komut kaydı: ${guildId}`
+                );
+
+            } else {
+
+                route =
+                    Routes.applicationCommands(
+                        client.user.id
+                    );
+
+
+                console.log(
+                    "🌐 Global komut kaydı kullanılıyor."
+                );
+
+            }
+
+
             await rest.put(
-                Routes.applicationCommands(
-                    client.user.id
-                ),
+                route,
                 {
-                    body:
-                        commands
+                    body: commands
                 }
             );
+
 
             console.log(
                 `✅ ${commands.length} slash komutu Discord'a yüklendi!`
             );
 
-        } catch (error) {
 
-            console.error(
-                "❌ Slash komut yükleme hatası:",
-                error
+            console.log(
+                "📋 Yüklenen komutlar:"
             );
-        }
-    }
-);
 
 
-// =====================================================
-// 🔥 TÜM INTERACTIONLAR
-// =====================================================
-
-client.on(
-    "interactionCreate",
-    async interaction => {
-
-        try {
-
-           if (interaction.isButton() || interaction.isModalSubmit()) {
-
-    const isYetkiliInteraction =
-        interaction.customId === "yetkili_basvuru_ac" ||
-        interaction.customId === "yetkili_basvuru_modal" ||
-        interaction.customId.startsWith("yetkili_kabul_") ||
-        interaction.customId.startsWith("yetkili_red_");
-
-    if (isYetkiliInteraction) {
-
-        const yetkiliCommand =
-            client.commands.get("yetkilibasvuru");
-
-        if (
-            yetkiliCommand &&
-            typeof yetkiliCommand.handleInteraction === "function"
-        ) {
-            await yetkiliCommand.handleInteraction(interaction);
-        }
-
-        return;
-    }
-}
-
-
-            // =================================================
-            // SLASH COMMAND
-            // =================================================
-
-            if (
-                !interaction.isChatInputCommand()
+            for (
+                const command
+                of commands
             ) {
-                return;
-            }
 
-
-            const command =
-                client.commands.get(
-                    interaction.commandName
+                console.log(
+                    `   /${command.name}`
                 );
 
-
-            if (!command) {
-
-                return interaction.reply({
-                    content:
-                        "❌ Bu komut bulunamadı.",
-                    ephemeral: true
-                });
             }
 
-
-            try {
-
-                await command.execute(
-                    interaction,
-                    client
-                );
-
-            } catch (error) {
-
-                console.error(
-                    `❌ /${interaction.commandName} hatası:`,
-                    error
-                );
-
-                try {
-
-                    if (
-                        interaction.replied ||
-                        interaction.deferred
-                    ) {
-
-                        await interaction.followUp({
-                            content:
-                                "❌ Komutu çalıştırırken bir hata oluştu.",
-                            ephemeral: true
-                        });
-
-                    } else {
-
-                        await interaction.reply({
-                            content:
-                                "❌ Komutu çalıştırırken bir hata oluştu.",
-                            ephemeral: true
-                        });
-                    }
-
-                } catch {}
-            }
 
         } catch (error) {
 
             console.error(
-                "❌ Interaction sistemi hatası:",
-                error
+                "❌ Slash komut yükleme hatası:"
             );
+
+            console.error(error);
+
         }
+
     }
 );
 
 
 // =====================================================
-// HATALAR
+// ❌ DISCORD HATALARI
 // =====================================================
 
 client.on(
@@ -847,9 +1101,14 @@ client.on(
             "❌ Discord hatası:",
             error
         );
+
     }
 );
 
+
+// =====================================================
+// ⚠️ UNHANDLED REJECTION
+// =====================================================
 
 process.on(
     "unhandledRejection",
@@ -859,9 +1118,14 @@ process.on(
             "❌ İşlenmeyen Promise hatası:",
             error
         );
+
     }
 );
 
+
+// =====================================================
+// 💥 UNCAUGHT EXCEPTION
+// =====================================================
 
 process.on(
     "uncaughtException",
@@ -871,12 +1135,13 @@ process.on(
             "❌ Kritik hata:",
             error
         );
+
     }
 );
 
 
 // =====================================================
-// TOKEN
+// 🔑 TOKEN KONTROL
 // =====================================================
 
 if (!config.token) {
@@ -885,14 +1150,20 @@ if (!config.token) {
         "❌ config.js üzerinden token bulunamadı!"
     );
 
+    console.error(
+        "❌ Render Environment Variables kısmından DISCORD_TOKEN ekle."
+    );
+
     process.exit(1);
+
 }
 
 
 // =====================================================
-// LOGIN
+// 🔐 LOGIN
 // =====================================================
 
 client.login(
     config.token
 );
+
