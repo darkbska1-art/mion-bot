@@ -1,502 +1,658 @@
 const {
     SlashCommandBuilder,
-    PermissionFlagsBits,
     EmbedBuilder,
+    PermissionFlagsBits,
     ChannelType
 } = require("discord.js");
 
 const fs = require("fs");
 const path = require("path");
 
-const dataPath = path.join(__dirname, "../data/welcome.json");
+// ============================================================
+// MION • HOŞ GELDİN AYARLA
+// Makima Welcome System ile tam uyumlu
+// ============================================================
 
-// =====================================================
-// DATA
-// =====================================================
+const DATA_FOLDER = path.join(
+    __dirname,
+    "..",
+    "data"
+);
 
-function getData() {
-    if (!fs.existsSync(dataPath)) {
-        fs.mkdirSync(path.dirname(dataPath), { recursive: true });
+const DATA_FILE = path.join(
+    DATA_FOLDER,
+    "welcome.json"
+);
+
+// ============================================================
+// KLASÖR
+// ============================================================
+
+if (!fs.existsSync(DATA_FOLDER)) {
+    fs.mkdirSync(
+        DATA_FOLDER,
+        {
+            recursive: true
+        }
+    );
+}
+
+// ============================================================
+// VERİ OKU
+// ============================================================
+
+function readData() {
+
+    if (!fs.existsSync(DATA_FILE)) {
 
         fs.writeFileSync(
-            dataPath,
-            JSON.stringify({}, null, 4)
+            DATA_FILE,
+            "{}",
+            "utf8"
         );
+
+        return {};
     }
 
     try {
-        return JSON.parse(fs.readFileSync(dataPath, "utf8"));
-    } catch {
+
+        const raw =
+            fs.readFileSync(
+                DATA_FILE,
+                "utf8"
+            );
+
+        if (!raw.trim()) {
+            return {};
+        }
+
+        return JSON.parse(raw);
+
+    } catch (error) {
+
+        console.error(
+            "❌ [Makima Ayar] welcome.json okunamadı:",
+            error
+        );
+
         return {};
     }
 }
 
+// ============================================================
+// VERİ KAYDET
+// ============================================================
+
 function saveData(data) {
+
     fs.writeFileSync(
-        dataPath,
-        JSON.stringify(data, null, 4)
+        DATA_FILE,
+        JSON.stringify(
+            data,
+            null,
+            4
+        ),
+        "utf8"
     );
 }
 
-// =====================================================
-// COMMAND
-// =====================================================
+// ============================================================
+// GUILD AYARI
+// ============================================================
+
+function getSettings(data, guildId) {
+
+    if (!data[guildId]) {
+
+        data[guildId] = {
+
+            enabled: false,
+
+            channel: null,
+
+            welcome: true,
+
+            goodbye: true,
+
+            mention: true
+        };
+    }
+
+    return data[guildId];
+}
+
+// ============================================================
+// EMBED
+// ============================================================
+
+function createEmbed(
+    title,
+    description
+) {
+
+    return new EmbedBuilder()
+        .setColor("#9e0000")
+        .setTitle(`🩸 ${title}`)
+        .setDescription(description)
+        .setFooter({
+            text: "Mion • Makima Welcome System"
+        })
+        .setTimestamp();
+}
+
+// ============================================================
+// KOMUT
+// ============================================================
 
 module.exports = {
+
     data: new SlashCommandBuilder()
+
         .setName("hosgeldin-ayarla")
-        .setDescription("Hoş geldin ve görüşürüz sistemini ayarlar.")
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
 
-        // -----------------------------
-        // HOŞ GELDİN KANALI
-        // -----------------------------
-        .addSubcommand(sub =>
-            sub
-                .setName("kanal")
-                .setDescription("Hoş geldin mesajlarının gönderileceği kanalı ayarlar.")
-                .addChannelOption(option =>
-                    option
-                        .setName("kanal")
-                        .setDescription("Hoş geldin kanalı")
-                        .addChannelTypes(ChannelType.GuildText)
-                        .setRequired(true)
-                )
+        .setDescription(
+            "Makima hoş geldin ve görüşürüz sistemini ayarla."
         )
 
-        // -----------------------------
-        // AYRILMA KANALI
-        // -----------------------------
-        .addSubcommand(sub =>
-            sub
-                .setName("ayrilma-kanal")
-                .setDescription("Görüşürüz mesajlarının gönderileceği kanalı ayarlar.")
-                .addChannelOption(option =>
-                    option
-                        .setName("kanal")
-                        .setDescription("Görüşürüz kanalı")
-                        .addChannelTypes(ChannelType.GuildText)
-                        .setRequired(true)
-                )
+        // ====================================================
+        // AÇ
+        // ====================================================
+
+        .addSubcommand(
+            sub =>
+                sub
+                    .setName("aç")
+                    .setDescription(
+                        "Hoş geldin sistemini aktif eder."
+                    )
         )
 
-        // -----------------------------
-        // HOŞ GELDİN MESAJI
-        // -----------------------------
-        .addSubcommand(sub =>
-            sub
-                .setName("mesaj")
-                .setDescription("Hoş geldin mesajını değiştirir.")
-                .addStringOption(option =>
-                    option
-                        .setName("metin")
-                        .setDescription("Hoş geldin mesajı")
-                        .setRequired(true)
-                )
+        // ====================================================
+        // KAPAT
+        // ====================================================
+
+        .addSubcommand(
+            sub =>
+                sub
+                    .setName("kapat")
+                    .setDescription(
+                        "Hoş geldin sistemini tamamen kapatır."
+                    )
         )
 
-        // -----------------------------
-        // AYRILMA MESAJI
-        // -----------------------------
-        .addSubcommand(sub =>
-            sub
-                .setName("ayrilma-mesaj")
-                .setDescription("Görüşürüz mesajını değiştirir.")
-                .addStringOption(option =>
-                    option
-                        .setName("metin")
-                        .setDescription("Görüşürüz mesajı")
-                        .setRequired(true)
-                )
+        // ====================================================
+        // KANAL
+        // ====================================================
+
+        .addSubcommand(
+            sub =>
+                sub
+                    .setName("kanal")
+                    .setDescription(
+                        "Hoş geldin ve görüşürüz kanalını ayarlar."
+                    )
+                    .addChannelOption(
+                        option =>
+                            option
+                                .setName("kanal")
+                                .setDescription(
+                                    "Mesajların gönderileceği kanal."
+                                )
+                                .addChannelTypes(
+                                    ChannelType.GuildText,
+                                    ChannelType.GuildAnnouncement
+                                )
+                                .setRequired(true)
+                    )
         )
 
-        // -----------------------------
-        // HOŞ GELDİN AÇ
-        // -----------------------------
-        .addSubcommand(sub =>
-            sub
-                .setName("ac")
-                .setDescription("Hoş geldin sistemini açar.")
+        // ====================================================
+        // HOŞ GELDİN
+        // ====================================================
+
+        .addSubcommand(
+            sub =>
+                sub
+                    .setName("hosgeldin")
+                    .setDescription(
+                        "Hoş geldin mesajlarını açar veya kapatır."
+                    )
+                    .addBooleanOption(
+                        option =>
+                            option
+                                .setName("durum")
+                                .setDescription(
+                                    "Hoş geldin sisteminin durumu."
+                                )
+                                .setRequired(true)
+                    )
         )
 
-        // -----------------------------
-        // HOŞ GELDİN KAPAT
-        // -----------------------------
-        .addSubcommand(sub =>
-            sub
-                .setName("kapat")
-                .setDescription("Hoş geldin sistemini kapatır.")
+        // ====================================================
+        // GÖRÜŞÜRÜZ
+        // ====================================================
+
+        .addSubcommand(
+            sub =>
+                sub
+                    .setName("gorusuruz")
+                    .setDescription(
+                        "Görüşürüz mesajlarını açar veya kapatır."
+                    )
+                    .addBooleanOption(
+                        option =>
+                            option
+                                .setName("durum")
+                                .setDescription(
+                                    "Görüşürüz sisteminin durumu."
+                                )
+                                .setRequired(true)
+                    )
         )
 
-        // -----------------------------
-        // AYRILMA AÇ
-        // -----------------------------
-        .addSubcommand(sub =>
-            sub
-                .setName("ayrilma-ac")
-                .setDescription("Görüşürüz sistemini açar.")
+        // ====================================================
+        // MENTION
+        // ====================================================
+
+        .addSubcommand(
+            sub =>
+                sub
+                    .setName("mention")
+                    .setDescription(
+                        "Hoş geldin mesajında kullanıcı etiketini açar/kapatır."
+                    )
+                    .addBooleanOption(
+                        option =>
+                            option
+                                .setName("durum")
+                                .setDescription(
+                                    "Kullanıcı etiketlensin mi?"
+                                )
+                                .setRequired(true)
+                    )
         )
 
-        // -----------------------------
-        // AYRILMA KAPAT
-        // -----------------------------
-        .addSubcommand(sub =>
-            sub
-                .setName("ayrilma-kapat")
-                .setDescription("Görüşürüz sistemini kapatır.")
-        )
-
-        // -----------------------------
-        // VARSAYILAN
-        // -----------------------------
-        .addSubcommand(sub =>
-            sub
-                .setName("varsayilan")
-                .setDescription("Mesajları varsayılan haline getirir.")
-        )
-
-        // -----------------------------
+        // ====================================================
         // DURUM
-        // -----------------------------
-        .addSubcommand(sub =>
-            sub
-                .setName("durum")
-                .setDescription("Hoş geldin sisteminin durumunu gösterir.")
+        // ====================================================
+
+        .addSubcommand(
+            sub =>
+                sub
+                    .setName("durum")
+                    .setDescription(
+                        "Mevcut Makima sistem ayarlarını gösterir."
+                    )
+        )
+
+        // ====================================================
+        // SIFIRLA
+        // ====================================================
+
+        .addSubcommand(
+            sub =>
+                sub
+                    .setName("sifirla")
+                    .setDescription(
+                        "Bu sunucunun Makima ayarlarını sıfırlar."
+                    )
+        )
+
+        .setDefaultMemberPermissions(
+            PermissionFlagsBits.ManageGuild
         ),
+
+    // ========================================================
+    // EXECUTE
+    // ========================================================
 
     async execute(interaction) {
 
-        const guildId = interaction.guild.id;
+        if (!interaction.guild) {
 
-        const data = getData();
-
-        if (!data[guildId]) {
-            data[guildId] = {
-                welcomeEnabled: false,
-                welcomeChannel: null,
-
-                leaveEnabled: false,
-                leaveChannel: null,
-
-                welcomeMessage:
-                    "👋 Hoş geldin {user}!\n\n" +
-                    "**{server}** ailesine katıldın.\n" +
-                    "Seninle birlikte **{membercount}** kişi olduk! ♡",
-
-                leaveMessage:
-                    "🚪 **{username}** sunucudan ayrıldı.\n\n" +
-                    "**{server}** artık **{membercount}** üyeye sahip."
-            };
+            return interaction.reply({
+                content:
+                    "❌ Bu komut sadece sunucularda kullanılabilir.",
+                ephemeral: true
+            });
         }
 
-        const guildData = data[guildId];
+        // ====================================================
+        // YETKİ
+        // ====================================================
+
+        if (
+            !interaction.memberPermissions.has(
+                PermissionFlagsBits.ManageGuild
+            )
+        ) {
+
+            return interaction.reply({
+
+                embeds: [
+                    createEmbed(
+                        "Yetkin Yok",
+                        "❌ Bu sistemi ayarlamak için **Sunucuyu Yönet** yetkisine sahip olmalısın."
+                    )
+                ],
+
+                ephemeral: true
+            });
+        }
+
+        const data =
+            readData();
+
+        const settings =
+            getSettings(
+                data,
+                interaction.guild.id
+            );
 
         const subcommand =
             interaction.options.getSubcommand();
 
-        // =================================================
-        // KANAL
-        // =================================================
-
-        if (subcommand === "kanal") {
-
-            const channel =
-                interaction.options.getChannel("kanal");
-
-            guildData.welcomeChannel = channel.id;
-
-            saveData(data);
-
-            return interaction.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xE31C23)
-                        .setTitle("👋 Hoş Geldin Kanalı")
-                        .setDescription(
-                            `Hoş geldin mesajları artık ${channel} kanalına gönderilecek.`
-                        )
-                        .setFooter({
-                            text: "Mion • Hoş Geldin Sistemi"
-                        })
-                ],
-                ephemeral: true
-            });
-        }
-
-        // =================================================
-        // AYRILMA KANALI
-        // =================================================
-
-        if (subcommand === "ayrilma-kanal") {
-
-            const channel =
-                interaction.options.getChannel("kanal");
-
-            guildData.leaveChannel = channel.id;
-
-            saveData(data);
-
-            return interaction.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xE31C23)
-                        .setTitle("🚪 Görüşürüz Kanalı")
-                        .setDescription(
-                            `Ayrılma mesajları artık ${channel} kanalına gönderilecek.`
-                        )
-                        .setFooter({
-                            text: "Mion • Görüşürüz Sistemi"
-                        })
-                ],
-                ephemeral: true
-            });
-        }
-
-        // =================================================
-        // MESAJ
-        // =================================================
-
-        if (subcommand === "mesaj") {
-
-            const message =
-                interaction.options.getString("metin");
-
-            guildData.welcomeMessage = message;
-
-            saveData(data);
-
-            return interaction.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xE31C23)
-                        .setTitle("✏️ Hoş Geldin Mesajı Güncellendi")
-                        .setDescription(
-                            `Yeni mesaj:\n\n${message}`
-                        )
-                ],
-                ephemeral: true
-            });
-        }
-
-        // =================================================
-        // AYRILMA MESAJI
-        // =================================================
-
-        if (subcommand === "ayrilma-mesaj") {
-
-            const message =
-                interaction.options.getString("metin");
-
-            guildData.leaveMessage = message;
-
-            saveData(data);
-
-            return interaction.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xE31C23)
-                        .setTitle("✏️ Görüşürüz Mesajı Güncellendi")
-                        .setDescription(
-                            `Yeni mesaj:\n\n${message}`
-                        )
-                ],
-                ephemeral: true
-            });
-        }
-
-        // =================================================
+        // ====================================================
         // AÇ
-        // =================================================
+        // ====================================================
 
-        if (subcommand === "ac") {
+        if (
+            subcommand === "aç"
+        ) {
 
-            if (!guildData.welcomeChannel) {
-                return interaction.reply({
-                    content:
-                        "❌ Önce `/hosgeldin-ayarla kanal` ile hoş geldin kanalını ayarlamalısın.",
-                    ephemeral: true
-                });
-            }
-
-            guildData.welcomeEnabled = true;
+            settings.enabled = true;
 
             saveData(data);
 
             return interaction.reply({
+
                 embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xE31C23)
-                        .setTitle("🟢 Hoş Geldin Sistemi Açıldı")
-                        .setDescription(
-                            `Hoş geldin sistemi aktif edildi.\n\n` +
-                            `📍 Kanal: <#${guildData.welcomeChannel}>`
-                        )
-                ],
-                ephemeral: true
+                    createEmbed(
+                        "Sistem Aktif",
+                        [
+                            "✅ **Makima Hoş Geldin Sistemi aktif edildi.**",
+                            "",
+                            `📢 Kanal: ${
+                                settings.channel
+                                    ? `<#${settings.channel}>`
+                                    : "❌ Ayarlanmadı"
+                            }`,
+                            `👋 Hoş Geldin: ${
+                                settings.welcome
+                                    ? "🟢 Açık"
+                                    : "🔴 Kapalı"
+                            }`,
+                            `👋 Görüşürüz: ${
+                                settings.goodbye
+                                    ? "🟢 Açık"
+                                    : "🔴 Kapalı"
+                            }`
+                        ].join("\n")
+                    )
+                ]
+
             });
         }
 
-        // =================================================
+        // ====================================================
         // KAPAT
-        // =================================================
+        // ====================================================
 
-        if (subcommand === "kapat") {
+        if (
+            subcommand === "kapat"
+        ) {
 
-            guildData.welcomeEnabled = false;
-
-            saveData(data);
-
-            return interaction.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xE31C23)
-                        .setTitle("🔴 Hoş Geldin Sistemi Kapatıldı")
-                        .setDescription(
-                            "Hoş geldin mesajları artık gönderilmeyecek."
-                        )
-                ],
-                ephemeral: true
-            });
-        }
-
-        // =================================================
-        // AYRILMA AÇ
-        // =================================================
-
-        if (subcommand === "ayrilma-ac") {
-
-            if (!guildData.leaveChannel) {
-                return interaction.reply({
-                    content:
-                        "❌ Önce `/hosgeldin-ayarla ayrilma-kanal` ile görüşürüz kanalını ayarlamalısın.",
-                    ephemeral: true
-                });
-            }
-
-            guildData.leaveEnabled = true;
+            settings.enabled = false;
 
             saveData(data);
 
             return interaction.reply({
+
                 embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xE31C23)
-                        .setTitle("🟢 Görüşürüz Sistemi Açıldı")
-                        .setDescription(
-                            `Görüşürüz sistemi aktif edildi.\n\n` +
-                            `📍 Kanal: <#${guildData.leaveChannel}>`
-                        )
-                ],
-                ephemeral: true
+                    createEmbed(
+                        "Sistem Kapatıldı",
+                        "🔴 **Makima Hoş Geldin Sistemi tamamen kapatıldı.**"
+                    )
+                ]
+
             });
         }
 
-        // =================================================
-        // AYRILMA KAPAT
-        // =================================================
+        // ====================================================
+        // KANAL
+        // ====================================================
 
-        if (subcommand === "ayrilma-kapat") {
+        if (
+            subcommand === "kanal"
+        ) {
 
-            guildData.leaveEnabled = false;
+            const channel =
+                interaction.options.getChannel(
+                    "kanal"
+                );
+
+            settings.channel =
+                channel.id;
 
             saveData(data);
 
             return interaction.reply({
+
                 embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xE31C23)
-                        .setTitle("🔴 Görüşürüz Sistemi Kapatıldı")
-                        .setDescription(
-                            "Ayrılma mesajları artık gönderilmeyecek."
-                        )
-                ],
-                ephemeral: true
+                    createEmbed(
+                        "Kanal Ayarlandı",
+                        [
+                            `✅ Hoş geldin ve görüşürüz mesajları artık ${channel} kanalına gönderilecek.`,
+                            "",
+                            `📢 Kanal: ${channel}`,
+                            `🆔 ID: \`${channel.id}\``,
+                            "",
+                            "💡 Sistemi kullanmak için `/hosgeldin-ayarla aç` yazmayı unutma."
+                        ].join("\n")
+                    )
+                ]
+
             });
         }
 
-        // =================================================
-        // VARSAYILAN
-        // =================================================
+        // ====================================================
+        // HOŞ GELDİN
+        // ====================================================
 
-        if (subcommand === "varsayilan") {
+        if (
+            subcommand === "hosgeldin"
+        ) {
 
-            guildData.welcomeMessage =
-                "👋 Hoş geldin {user}!\n\n" +
-                "**{server}** ailesine katıldın.\n" +
-                "Seninle birlikte **{membercount}** kişi olduk! ♡";
+            const status =
+                interaction.options.getBoolean(
+                    "durum"
+                );
 
-            guildData.leaveMessage =
-                "🚪 **{username}** sunucudan ayrıldı.\n\n" +
-                "**{server}** artık **{membercount}** üyeye sahip.";
+            settings.welcome =
+                status;
 
             saveData(data);
 
             return interaction.reply({
+
                 embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xE31C23)
-                        .setTitle("↩️ Varsayılan Mesajlar")
-                        .setDescription(
-                            "Hoş geldin ve görüşürüz mesajları varsayılan haline getirildi."
-                        )
-                ],
-                ephemeral: true
+                    createEmbed(
+                        "Hoş Geldin Ayarı",
+                        status
+                            ? "🟢 **Hoş geldin mesajları açıldı.**"
+                            : "🔴 **Hoş geldin mesajları kapatıldı.**"
+                    )
+                ]
+
             });
         }
 
-        // =================================================
+        // ====================================================
+        // GÖRÜŞÜRÜZ
+        // ====================================================
+
+        if (
+            subcommand === "gorusuruz"
+        ) {
+
+            const status =
+                interaction.options.getBoolean(
+                    "durum"
+                );
+
+            settings.goodbye =
+                status;
+
+            saveData(data);
+
+            return interaction.reply({
+
+                embeds: [
+                    createEmbed(
+                        "Görüşürüz Ayarı",
+                        status
+                            ? "🟢 **Görüşürüz mesajları açıldı.**"
+                            : "🔴 **Görüşürüz mesajları kapatıldı.**"
+                    )
+                ]
+
+            });
+        }
+
+        // ====================================================
+        // MENTION
+        // ====================================================
+
+        if (
+            subcommand === "mention"
+        ) {
+
+            const status =
+                interaction.options.getBoolean(
+                    "durum"
+                );
+
+            settings.mention =
+                status;
+
+            saveData(data);
+
+            return interaction.reply({
+
+                embeds: [
+                    createEmbed(
+                        "Mention Ayarı",
+                        status
+                            ? "🟢 Yeni katılan kullanıcı mesajda etiketlenecek."
+                            : "🔴 Yeni katılan kullanıcı mesajda etiketlenmeyecek."
+                    )
+                ]
+
+            });
+        }
+
+        // ====================================================
         // DURUM
-        // =================================================
+        // ====================================================
 
-        if (subcommand === "durum") {
+        if (
+            subcommand === "durum"
+        ) {
 
-            const welcomeStatus =
-                guildData.welcomeEnabled
+            const channelText =
+                settings.channel
+                    ? `<#${settings.channel}>`
+                    : "❌ Ayarlanmadı";
+
+            const enabledText =
+                settings.enabled
                     ? "🟢 Açık"
                     : "🔴 Kapalı";
 
-            const leaveStatus =
-                guildData.leaveEnabled
+            const welcomeText =
+                settings.welcome
                     ? "🟢 Açık"
                     : "🔴 Kapalı";
 
-            const welcomeChannel =
-                guildData.welcomeChannel
-                    ? `<#${guildData.welcomeChannel}>`
-                    : "Ayarlanmamış";
+            const goodbyeText =
+                settings.goodbye
+                    ? "🟢 Açık"
+                    : "🔴 Kapalı";
 
-            const leaveChannel =
-                guildData.leaveChannel
-                    ? `<#${guildData.leaveChannel}>`
-                    : "Ayarlanmamış";
+            const mentionText =
+                settings.mention
+                    ? "🟢 Açık"
+                    : "🔴 Kapalı";
 
             return interaction.reply({
+
                 embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xE31C23)
-                        .setTitle("⚙️ Hoş Geldin Sistemi")
-                        .setDescription(
-                            `**Hoş Geldin**\n` +
-                            `${welcomeStatus}\n` +
-                            `📍 Kanal: ${welcomeChannel}\n\n` +
-
-                            `**Görüşürüz**\n` +
-                            `${leaveStatus}\n` +
-                            `📍 Kanal: ${leaveChannel}\n\n` +
-
-                            `━━━━━━━━━━━━━━━━━━\n\n` +
-
-                            `**Hoş Geldin Mesajı**\n` +
-                            `${guildData.welcomeMessage}\n\n` +
-
-                            `**Görüşürüz Mesajı**\n` +
-                            `${guildData.leaveMessage}`
-                        )
-                        .setFooter({
-                            text: "Mion • Hoş Geldin & Görüşürüz"
-                        })
+                    createEmbed(
+                        "Makima Sistem Durumu",
+                        [
+                            `⚙️ **Ana Sistem:** ${enabledText}`,
+                            "",
+                            `📢 **Kanal:** ${channelText}`,
+                            `👋 **Hoş Geldin:** ${welcomeText}`,
+                            `🚪 **Görüşürüz:** ${goodbyeText}`,
+                            `🏷️ **Mention:** ${mentionText}`,
+                            "",
+                            "━━━━━━━━━━━━━━━━━━━━",
+                            "",
+                            settings.enabled &&
+                            settings.channel
+                                ? "✅ Sistem kullanıma hazır."
+                                : "⚠️ Sistem henüz tamamen ayarlanmadı."
+                        ].join("\n")
+                    )
                 ],
+
                 ephemeral: true
+
+            });
+        }
+
+        // ====================================================
+        // SIFIRLA
+        // ====================================================
+
+        if (
+            subcommand === "sifirla"
+        ) {
+
+            data[interaction.guild.id] = {
+
+                enabled: false,
+
+                channel: null,
+
+                welcome: true,
+
+                goodbye: true,
+
+                mention: true
+
+            };
+
+            saveData(data);
+
+            return interaction.reply({
+
+                embeds: [
+                    createEmbed(
+                        "Ayarlar Sıfırlandı",
+                        [
+                            "♻️ Bu sunucunun Makima ayarları sıfırlandı.",
+                            "",
+                            "🔴 Ana sistem: Kapalı",
+                            "📢 Kanal: Ayarlanmadı",
+                            "👋 Hoş geldin: Açık",
+                            "🚪 Görüşürüz: Açık",
+                            "🏷️ Mention: Açık"
+                        ].join("\n")
+                    )
+                ]
+
             });
         }
     }
