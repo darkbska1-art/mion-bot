@@ -15,56 +15,30 @@ const path = require("path");
 // DOSYALAR
 // =====================================================
 
-const dataFile = path.join(
-    __dirname,
-    "..",
-    "data",
-    "welcome.json"
-);
+const dataFolder = path.join(__dirname, "..", "data");
+const dataFile = path.join(dataFolder, "welcome.json");
+
+if (!fs.existsSync(dataFolder)) {
+    fs.mkdirSync(dataFolder, { recursive: true });
+}
 
 // =====================================================
-// MAKIMA GÖRSEL YOLLARI
+// MAKIMA GÖRSELLERİNİ BUL
 // =====================================================
 
 const imageCandidates = [
-
-    // Projenin ana klasörü
-    path.join(
-        process.cwd(),
-        "images"
-    ),
-
-    // Commands / Events klasöründen bir üst
-    path.join(
-        __dirname,
-        "..",
-        "images"
-    ),
-
-    // Dosyanın bulunduğu klasörün içindeki images
-    path.join(
-        __dirname,
-        "images"
-    )
+    path.join(process.cwd(), "images"),
+    path.join(__dirname, "..", "images"),
+    path.join(__dirname, "images")
 ];
-
-// =====================================================
-// GÖRSEL BUL
-// =====================================================
 
 function findImage(fileName) {
 
     for (const folder of imageCandidates) {
 
-        const fullPath =
-            path.join(
-                folder,
-                fileName
-            );
+        const fullPath = path.join(folder, fileName);
 
-        if (
-            fs.existsSync(fullPath)
-        ) {
+        if (fs.existsSync(fullPath)) {
 
             console.log(
                 `✓ Makima görseli bulundu: ${fullPath}`
@@ -78,48 +52,43 @@ function findImage(fileName) {
         `❌ Makima görseli bulunamadı: ${fileName}`
     );
 
-    console.error(
-        "Aranan klasörler:"
-    );
+    console.error("Aranan klasörler:");
 
     for (const folder of imageCandidates) {
-
-        console.error(
-            `   → ${folder}`
-        );
+        console.error(`   → ${folder}`);
     }
 
     return null;
 }
 
+// BURASI ÖNEMLİ
+const welcomeBackground =
+    findImage("makima-welcome.png");
+
+const goodbyeBackground =
+    findImage("makima-goodbye.png");
+
 // =====================================================
-// DATA
+// VERİ OKUMA
 // =====================================================
 
 function getData() {
 
+    if (!fs.existsSync(dataFile)) {
+        return {};
+    }
+
     try {
 
-        if (!fs.existsSync(dataFile)) {
-            return {};
-        }
-
-        const raw =
-            fs.readFileSync(
-                dataFile,
-                "utf8"
-            ).trim();
-
-        if (!raw) {
-            return {};
-        }
-
-        return JSON.parse(raw);
+        return JSON.parse(
+            fs.readFileSync(dataFile, "utf8")
+        );
 
     } catch (error) {
 
         console.error(
-            `[Welcome Data] ${error.message}`
+            "❌ welcome.json okunamadı:",
+            error
         );
 
         return {};
@@ -127,89 +96,76 @@ function getData() {
 }
 
 // =====================================================
-// HESAP YAŞI
+// HESAPLAMA
 // =====================================================
 
-function getAccountAge(timestamp) {
+function getAccountAge(user) {
 
-    const days = Math.floor(
-        (Date.now() - timestamp) /
-        86400000
-    );
+    const created = user.createdTimestamp;
 
-    if (days >= 365) {
+    const diff =
+        Date.now() - created;
 
-        const years =
-            Math.floor(days / 365);
+    const days =
+        Math.floor(
+            diff / (1000 * 60 * 60 * 24)
+        );
 
-        const remainingMonths =
-            Math.floor(
-                (days % 365) / 30
-            );
-
-        if (remainingMonths > 0) {
-            return `${years} yıl ${remainingMonths} ay`;
-        }
-
-        return `${years} yıl`;
+    if (days < 1) {
+        return "Bugün oluşturuldu";
     }
 
-    if (days >= 30) {
-
-        const months =
-            Math.floor(days / 30);
-
-        return `${months} ay`;
+    if (days === 1) {
+        return "1 gün önce oluşturuldu";
     }
 
-    if (days <= 0) {
-        return "Bugün";
+    if (days < 30) {
+        return `${days} gün önce oluşturuldu`;
     }
 
-    return `${days} gün`;
+    const months =
+        Math.floor(days / 30);
+
+    if (months < 12) {
+        return `${months} ay önce oluşturuldu`;
+    }
+
+    const years =
+        Math.floor(months / 12);
+
+    return `${years} yıl önce oluşturuldu`;
 }
 
 // =====================================================
-// TEXT FIT
+// METİN SIĞDIRMA
 // =====================================================
 
 function fitText(
     ctx,
     text,
-    maxWidth
+    maxWidth,
+    startSize,
+    minSize
 ) {
 
-    const original =
-        String(text);
-
-    let result =
-        original;
+    let size = startSize;
 
     while (
-        ctx.measureText(result).width >
-        maxWidth &&
-        result.length > 1
+        size > minSize &&
+        ctx.measureText(text).width > maxWidth
     ) {
 
-        result =
-            result.slice(0, -1);
+        size--;
+
+        ctx.font =
+            `700 ${size}px Arial`;
     }
 
-    if (
-        result !== original
-    ) {
-
-        return (
-            result.slice(0, -3) +
-            "..."
-        );
-    }
-
-    return result;
+    return size;
 }
 
 // =====================================================
-// ROUND RECT
+// YUVARLAK KÖŞELİ ALAN
 // =====================================================
 
 function roundRect(
@@ -280,10 +236,10 @@ function roundRect(
 }
 
 // =====================================================
-// CIRCLE IMAGE
+// DAİRESEL AVATAR
 // =====================================================
 
-function drawCircleImage(
+async function drawCircleImage(
     ctx,
     image,
     x,
@@ -319,7 +275,7 @@ function drawCircleImage(
 }
 
 // =====================================================
-// COVER IMAGE
+// COVER
 // =====================================================
 
 function drawCover(
@@ -332,55 +288,45 @@ function drawCover(
 ) {
 
     const imageRatio =
-        image.width /
-        image.height;
+        image.width / image.height;
 
     const boxRatio =
-        width /
-        height;
+        width / height;
 
     let drawWidth;
     let drawHeight;
-    let drawX;
-    let drawY;
+    let offsetX;
+    let offsetY;
 
-    if (
-        imageRatio > boxRatio
-    ) {
+    if (imageRatio > boxRatio) {
 
-        drawHeight =
-            height;
+        drawHeight = height;
 
         drawWidth =
-            height *
-            imageRatio;
+            height * imageRatio;
 
-        drawX =
-            x +
-            (width - drawWidth) / 2;
+        offsetX =
+            x + (width - drawWidth) / 2;
 
-        drawY = y;
+        offsetY = y;
 
     } else {
 
-        drawWidth =
-            width;
+        drawWidth = width;
 
         drawHeight =
-            width /
-            imageRatio;
+            width / imageRatio;
 
-        drawX = x;
+        offsetX = x;
 
-        drawY =
-            y +
-            (height - drawHeight) / 2;
+        offsetY =
+            y + (height - drawHeight) / 2;
     }
 
     ctx.drawImage(
         image,
-        drawX,
-        drawY,
+        offsetX,
+        offsetY,
         drawWidth,
         drawHeight
     );
@@ -393,14 +339,8 @@ function drawCover(
 async function drawBackground(
     ctx,
     file,
-    width,
-    height,
     type
 ) {
-
-    // =================================================
-    // DOSYA KONTROLÜ
-    // =================================================
 
     if (!file) {
 
@@ -410,155 +350,80 @@ async function drawBackground(
 
         drawFallback(
             ctx,
-            width,
-            height,
             type
         );
 
-        return false;
+        return;
     }
 
-    // =================================================
-    // MAKIMA GÖRSELİNİ YÜKLE
-    // =================================================
-
     try {
-
-        console.log(
-            `🖼️ Makima yükleniyor: ${file}`
-        );
 
         const background =
             await loadImage(file);
 
-        console.log(
-            `✓ Makima başarıyla yüklendi: ${background.width}x${background.height}`
-        );
-
-        // =================================================
-        // COVER
-        // =================================================
-
-        const imageRatio =
-            background.width /
-            background.height;
-
-        const canvasRatio =
-            width /
-            height;
-
-        let drawWidth;
-        let drawHeight;
-        let drawX;
-        let drawY;
-
-        if (
-            imageRatio > canvasRatio
-        ) {
-
-            drawHeight =
-                height;
-
-            drawWidth =
-                height *
-                imageRatio;
-
-            drawX =
-                (width - drawWidth) / 2;
-
-            drawY = 0;
-
-        } else {
-
-            drawWidth =
-                width;
-
-            drawHeight =
-                width /
-                imageRatio;
-
-            drawX = 0;
-
-            drawY =
-                (height - drawHeight) / 2;
-        }
-
-        // =================================================
-        // MAKIMA'YI ÇİZ
-        // =================================================
-
-        ctx.drawImage(
+        drawCover(
+            ctx,
             background,
-            drawX,
-            drawY,
-            drawWidth,
-            drawHeight
+            0,
+            0,
+            1200,
+            500
         );
 
-        // =================================================
-        // HAFİF KARARTMA
-        // =================================================
-
-        const overlay =
+        // Koyu overlay
+        const gradient =
             ctx.createLinearGradient(
                 0,
                 0,
-                width,
+                1200,
                 0
             );
 
-        overlay.addColorStop(
+        gradient.addColorStop(
             0,
-            "rgba(0,0,0,0.02)"
+            "rgba(0,0,0,0.88)"
         );
 
-        overlay.addColorStop(
-            0.45,
-            "rgba(0,0,0,0.05)"
+        gradient.addColorStop(
+            0.55,
+            "rgba(0,0,0,0.55)"
         );
 
-        overlay.addColorStop(
+        gradient.addColorStop(
             1,
-            "rgba(0,0,0,0.16)"
+            "rgba(0,0,0,0.18)"
         );
 
-        ctx.fillStyle =
-            overlay;
+        ctx.fillStyle = gradient;
 
         ctx.fillRect(
             0,
             0,
-            width,
-            height
+            1200,
+            500
         );
-
-        return true;
 
     } catch (error) {
 
         console.error(
-            `[Makima BG] ${error.stack || error.message}`
+            `[Makima] Görsel yüklenemedi: ${file}`
         );
+
+        console.error(error);
 
         drawFallback(
             ctx,
-            width,
-            height,
             type
         );
-
-        return false;
     }
 }
 
 // =====================================================
-// YEDEK ARKA PLAN
+// FALLBACK
 // =====================================================
 
 function drawFallback(
     ctx,
-    width,
-    height,
     type
 ) {
 
@@ -566,25 +431,23 @@ function drawFallback(
         ctx.createLinearGradient(
             0,
             0,
-            width,
-            height
+            1200,
+            500
         );
 
     gradient.addColorStop(
         0,
-        "#180000"
+        "#080808"
     );
 
     gradient.addColorStop(
         0.5,
-        type === "welcome"
-            ? "#8b0000"
-            : "#550000"
+        "#240000"
     );
 
     gradient.addColorStop(
         1,
-        "#050000"
+        "#050505"
     );
 
     ctx.fillStyle =
@@ -593,12 +456,37 @@ function drawFallback(
     ctx.fillRect(
         0,
         0,
-        width,
-        height
+        1200,
+        500
+    );
+
+    ctx.fillStyle =
+        "rgba(150,0,0,0.20)";
+
+    ctx.fillRect(
+        0,
+        0,
+        1200,
+        500
+    );
+
+    ctx.font =
+        "700 24px Arial";
+
+    ctx.fillStyle =
+        "rgba(255,255,255,0.15)";
+
+    ctx.fillText(
+        type === "welcome"
+            ? "MAKIMA • WELCOME"
+            : "MAKIMA • GOODBYE",
+        850,
+        460
     );
 }
+
 // =====================================================
-// ANA GÖRSEL
+// ANA GÖRSEL OLUŞTURMA
 // =====================================================
 
 async function createImage(
@@ -606,21 +494,18 @@ async function createImage(
     type
 ) {
 
-    const width = 1200;
-    const height = 500;
-
     const canvas =
         createCanvas(
-            width,
-            height
+            1200,
+            500
         );
 
     const ctx =
         canvas.getContext("2d");
 
-    // =================================================
-    // MAKIMA
-    // =================================================
+    // -------------------------------------------------
+    // DOĞRU GÖRSEL
+    // -------------------------------------------------
 
     const background =
         type === "welcome"
@@ -630,370 +515,336 @@ async function createImage(
     await drawBackground(
         ctx,
         background,
-        width,
-        height,
         type
     );
 
-    // =================================================
-    // SAĞ DİNAMİK PANEL
-    // =================================================
+    // -------------------------------------------------
+    // SOL PANEL
+    // -------------------------------------------------
 
-    roundRect(
-        ctx,
-        655,
-        55,
-        485,
-        390,
-        28
+    const panelGradient =
+        ctx.createLinearGradient(
+            0,
+            0,
+            650,
+            0
+        );
+
+    panelGradient.addColorStop(
+        0,
+        "rgba(0,0,0,0.94)"
+    );
+
+    panelGradient.addColorStop(
+        0.75,
+        "rgba(0,0,0,0.70)"
+    );
+
+    panelGradient.addColorStop(
+        1,
+        "rgba(0,0,0,0)"
     );
 
     ctx.fillStyle =
-        "rgba(0,0,0,0.76)";
+        panelGradient;
 
-    ctx.fill();
-
-    ctx.strokeStyle =
-        "rgba(255,40,55,0.95)";
-
-    ctx.lineWidth = 3;
-
-    ctx.stroke();
-
-    // İç çizgi
-
-    roundRect(
-        ctx,
-        666,
-        66,
-        463,
-        368,
-        22
+    ctx.fillRect(
+        0,
+        0,
+        700,
+        500
     );
 
-    ctx.strokeStyle =
-        "rgba(255,100,100,0.20)";
-
-    ctx.lineWidth = 1;
-
-    ctx.stroke();
-
-    // =================================================
-    // BAŞLIK
-    // =================================================
-
-    ctx.textAlign =
-        "left";
-
-    ctx.font =
-        "bold 18px Sans";
+    // -------------------------------------------------
+    // KIRMIZI ÇİZGİ
+    // -------------------------------------------------
 
     ctx.fillStyle =
-        "#ff5265";
+        "#9e0000";
 
-    ctx.fillText(
-        type === "welcome"
-            ? "❤️  HOŞ GELDİN!"
-            : "🚪  GÖRÜŞÜRÜZ!",
-        695,
-        100
+    ctx.fillRect(
+        0,
+        0,
+        7,
+        500
     );
 
-    // =================================================
-    // KULLANICI ADI
-    // =================================================
-
-    const displayName =
-        member.user.globalName ||
-        member.user.username;
-
-    ctx.font =
-        "bold 40px Sans";
-
-    ctx.fillStyle =
-        "#ffffff";
-
-    ctx.fillText(
-        fitText(
-            ctx,
-            displayName,
-            410
-        ),
-        695,
-        150
-    );
-
-    // =================================================
-    // AÇIKLAMA
-    // =================================================
-
-    ctx.font =
-        "18px Sans";
-
-    ctx.fillStyle =
-        "#ffcccc";
-
-    ctx.fillText(
-        type === "welcome"
-            ? "Aramıza katıldığın için mutluyuz."
-            : "Sunucumuzdan ayrıldı. Görüşürüz!",
-        695,
-        181
-    );
-
-    // =================================================
+    // -------------------------------------------------
     // AVATAR
-    // =================================================
-
-    let avatar = null;
+    // -------------------------------------------------
 
     try {
 
-        avatar =
+        const avatarURL =
+            member.user.displayAvatarURL({
+                extension: "png",
+                size: 256
+            });
+
+        const avatar =
             await loadImage(
-                member.user.displayAvatarURL({
-                    extension: "png",
-                    size: 512,
-                    forceStatic: true
-                })
+                avatarURL
             );
 
-    } catch (error) {
-
-        console.error(
-            `[Avatar] ${error.message}`
-        );
-    }
-
-    const avatarX = 610;
-    const avatarY = 250;
-    const avatarRadius = 78;
-
-    // Avatar glow
-
-    ctx.beginPath();
-
-    ctx.arc(
-        avatarX,
-        avatarY,
-        avatarRadius + 14,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.fillStyle =
-        "rgba(255,0,35,0.28)";
-
-    ctx.fill();
-
-    ctx.beginPath();
-
-    ctx.arc(
-        avatarX,
-        avatarY,
-        avatarRadius + 8,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.strokeStyle =
-        "#ff3045";
-
-    ctx.lineWidth = 4;
-
-    ctx.stroke();
-
-    if (avatar) {
-
-        drawCircleImage(
-            ctx,
-            avatar,
-            avatarX,
-            avatarY,
-            avatarRadius
-        );
-
-    } else {
-
+        // Avatar dış halkası
         ctx.beginPath();
 
         ctx.arc(
-            avatarX,
-            avatarY,
-            avatarRadius,
+            115,
+            125,
+            72,
             0,
             Math.PI * 2
         );
 
         ctx.fillStyle =
-            "#350000";
+            "#9e0000";
 
         ctx.fill();
+
+        await drawCircleImage(
+            ctx,
+            avatar,
+            115,
+            125,
+            64
+        );
+
+    } catch (error) {
+
+        console.error(
+            "❌ Avatar yüklenemedi:",
+            error
+        );
     }
 
-    // =================================================
-    // BİLGİ KUTULARI
-    // =================================================
+    // -------------------------------------------------
+    // BAŞLIK
+    // -------------------------------------------------
 
-    const memberCount =
-        member.guild.memberCount
-            .toLocaleString("tr-TR");
-
-    // Üye sayısı
-
-    roundRect(
-        ctx,
-        695,
-        220,
-        200,
-        70,
-        14
-    );
-
-    ctx.fillStyle =
-        "rgba(150,0,15,0.32)";
-
-    ctx.fill();
-
-    ctx.strokeStyle =
-        "rgba(255,70,80,0.45)";
-
-    ctx.lineWidth = 1;
-
-    ctx.stroke();
-
-    ctx.font =
-        "bold 22px Sans";
-
-    ctx.fillStyle =
-        "#ffffff";
-
-    ctx.fillText(
+    const title =
         type === "welcome"
-            ? `#${memberCount} Üye`
-            : `${memberCount} Üye`,
-        715,
-        250
-    );
+            ? "HOŞ GELDİN"
+            : "GÖRÜŞÜRÜZ";
 
     ctx.font =
-        "14px Sans";
-
-    ctx.fillStyle =
-        "#ffaaaa";
-
-    ctx.fillText(
-        type === "welcome"
-            ? "Sunucudaki üye sayısı"
-            : "Sunucuda kalan üye",
-        715,
-        273
-    );
-
-    // Hesap yaşı
-
-    roundRect(
-        ctx,
-        915,
-        220,
-        200,
-        70,
-        14
-    );
-
-    ctx.fillStyle =
-        "rgba(150,0,15,0.32)";
-
-    ctx.fill();
-
-    ctx.strokeStyle =
-        "rgba(255,70,80,0.45)";
-
-    ctx.stroke();
-
-    ctx.font =
-        "bold 20px Sans";
+        "900 46px Arial";
 
     ctx.fillStyle =
         "#ffffff";
 
     ctx.fillText(
-        getAccountAge(
-            member.user.createdTimestamp
-        ),
-        935,
-        250
+        title,
+        210,
+        105
     );
 
-    ctx.font =
-        "14px Sans";
+    // -------------------------------------------------
+    // KIRMIZI ALT ÇİZGİ
+    // -------------------------------------------------
 
     ctx.fillStyle =
-        "#ffaaaa";
+        "#9e0000";
 
-    ctx.fillText(
-        "Hesap yaşı",
-        935,
-        273
+    ctx.fillRect(
+        210,
+        120,
+        155,
+        4
     );
 
-    // =================================================
-    // SUNUCU
-    // =================================================
+    // -------------------------------------------------
+    // KULLANICI ADI
+    // -------------------------------------------------
 
-    ctx.font =
-        "bold 18px Sans";
+    const username =
+        member.user.username;
 
-    ctx.fillStyle =
-        "#ffffff";
-
-    ctx.fillText(
+    const usernameSize =
         fitText(
             ctx,
-            member.guild.name,
-            420
-        ),
-        695,
-        330
-    );
-
-    // =================================================
-    // USERNAME
-    // =================================================
+            username,
+            430,
+            34,
+            20
+        );
 
     ctx.font =
-        "15px Sans";
+        `700 ${usernameSize}px Arial`;
 
     ctx.fillStyle =
-        "#ffaaaa";
+        "#ffffff";
 
     ctx.fillText(
-        `@${member.user.username}`,
-        695,
-        357
+        username,
+        210,
+        165
     );
 
-    // =================================================
-    // FOOTER
-    // =================================================
+    // -------------------------------------------------
+    // SUNUCU
+    // -------------------------------------------------
 
     ctx.font =
-        "bold 15px Sans";
+        "600 20px Arial";
 
     ctx.fillStyle =
-        "#ff7f8c";
+        "#bbbbbb";
 
     ctx.fillText(
-        type === "welcome"
-            ? "Mion • Makima • Hoş geldin ❤️"
-            : "Mion • Makima • Görüşürüz ❤️",
-        695,
-        405
+        member.guild.name,
+        210,
+        198
     );
 
-    // =================================================
+    // -------------------------------------------------
+    // BİLGİ PANELİ
+    // -------------------------------------------------
+
+    roundRect(
+        ctx,
+        50,
+        270,
+        560,
+        150,
+        20
+    );
+
+    ctx.fillStyle =
+        "rgba(0,0,0,0.62)";
+
+    ctx.fill();
+
+    // -------------------------------------------------
+    // ÜYE SAYISI
+    // -------------------------------------------------
+
+    ctx.font =
+        "700 18px Arial";
+
+    ctx.fillStyle =
+        "#999999";
+
+    ctx.fillText(
+        "SUNUCUDAKİ ÜYE",
+        80,
+        310
+    );
+
+    ctx.font =
+        "800 28px Arial";
+
+    ctx.fillStyle =
+        "#ffffff";
+
+    ctx.fillText(
+        `${member.guild.memberCount}`,
+        80,
+        345
+    );
+
+    // -------------------------------------------------
+    // HESAP YAŞI
+    // -------------------------------------------------
+
+    ctx.font =
+        "700 18px Arial";
+
+    ctx.fillStyle =
+        "#999999";
+
+    ctx.fillText(
+        "HESAP YAŞI",
+        280,
+        310
+    );
+
+    ctx.font =
+        "700 19px Arial";
+
+    ctx.fillStyle =
+        "#ffffff";
+
+    ctx.fillText(
+        getAccountAge(member.user),
+        280,
+        345
+    );
+
+    // -------------------------------------------------
+    // ÜYE ID
+    // -------------------------------------------------
+
+    ctx.font =
+        "700 18px Arial";
+
+    ctx.fillStyle =
+        "#999999";
+
+    ctx.fillText(
+        "KULLANICI ID",
+        80,
+        385
+    );
+
+    ctx.font =
+        "600 17px Arial";
+
+    ctx.fillStyle =
+        "#ffffff";
+
+    ctx.fillText(
+        member.id,
+        80,
+        407
+    );
+
+    // -------------------------------------------------
+    // MAKIMA YAZISI
+    // -------------------------------------------------
+
+    ctx.save();
+
+    ctx.translate(
+        1130,
+        430
+    );
+
+    ctx.rotate(
+        -Math.PI / 2
+    );
+
+    ctx.font =
+        "900 18px Arial";
+
+    ctx.fillStyle =
+        "rgba(255,255,255,0.35)";
+
+    ctx.fillText(
+        "MION • MAKIMA SYSTEM",
+        0,
+        0
+    );
+
+    ctx.restore();
+
+    // -------------------------------------------------
+    // ALT KIRMIZI DETAY
+    // -------------------------------------------------
+
+    ctx.fillStyle =
+        "#9e0000";
+
+    ctx.fillRect(
+        50,
+        450,
+        300,
+        3
+    );
+
+    // -------------------------------------------------
     // PNG
-    // =================================================
+    // -------------------------------------------------
 
     return canvas.toBuffer(
         "image/png"
@@ -1001,7 +852,7 @@ async function createImage(
 }
 
 // =====================================================
-// EVENTLER
+// EVENT SİSTEMİ
 // =====================================================
 
 module.exports = {
@@ -1009,47 +860,39 @@ module.exports = {
     register(client) {
 
         // =================================================
-        // HOŞ GELDİN
+        // ÜYE KATILDI
         // =================================================
 
         client.on(
             "guildMemberAdd",
             async member => {
 
-                const db =
-                    getData();
-
-                const ayar =
-                    db[member.guild.id];
-
-                if (!ayar) {
-                    return;
-                }
-
-                if (
-                    !ayar.welcomeEnabled
-                ) {
-                    return;
-                }
-
-                if (
-                    !ayar.welcomeChannel
-                ) {
-                    return;
-                }
-
-                const channel =
-                    member.guild.channels.cache.get(
-                        ayar.welcomeChannel
-                    );
-
-                if (!channel) {
-                    return;
-                }
-
                 try {
 
-                    const image =
+                    const data =
+                        getData();
+
+                    const guildData =
+                        data[member.guild.id];
+
+                    if (
+                        !guildData ||
+                        !guildData.enabled ||
+                        !guildData.channel
+                    ) {
+                        return;
+                    }
+
+                    const channel =
+                        member.guild.channels.cache.get(
+                            guildData.channel
+                        );
+
+                    if (!channel) {
+                        return;
+                    }
+
+                    const buffer =
                         await createImage(
                             member,
                             "welcome"
@@ -1057,7 +900,7 @@ module.exports = {
 
                     const attachment =
                         new AttachmentBuilder(
-                            image,
+                            buffer,
                             {
                                 name:
                                     "makima-welcome.png"
@@ -1066,119 +909,71 @@ module.exports = {
 
                     const embed =
                         new EmbedBuilder()
-                            .setColor(
-                                0xE31C23
-                            )
-                            .setTitle(
-                                "❤️ Hoş Geldin!"
-                            )
-                            .setDescription(
-                                `Aramıza hoş geldin ${member}!\n` +
-                                `**${member.guild.name}** ailesine katıldın.`
-                            )
-                            .setThumbnail(
-                                member.user.displayAvatarURL({
-                                    size: 256
-                                })
-                            )
+                            .setColor("#9e0000")
                             .setImage(
                                 "attachment://makima-welcome.png"
                             )
-                            .addFields(
-                                {
-                                    name: "👤 Kullanıcı",
-                                    value:
-                                        `${member}\n` +
-                                        `\`${member.user.username}\``,
-                                    inline: true
-                                },
-                                {
-                                    name: "👥 Üye Sayısı",
-                                    value:
-                                        member.guild.memberCount
-                                            .toLocaleString("tr-TR"),
-                                    inline: true
-                                },
-                                {
-                                    name: "📅 Hesap Yaşı",
-                                    value:
-                                        getAccountAge(
-                                            member.user.createdTimestamp
-                                        ),
-                                    inline: true
-                                }
-                            )
                             .setFooter({
                                 text:
-                                    "Mion • Makima • Hoş geldin ❤️"
+                                    `${member.guild.name} • Mion`
                             })
                             .setTimestamp();
 
                     await channel.send({
-                        content: `${member}`,
-                        embeds: [
-                            embed
-                        ],
-                        files: [
-                            attachment
-                        ]
+                        content:
+                            `👋 Hoş geldin ${member}!`,
+                        embeds: [embed],
+                        files: [attachment]
                     });
 
                     console.log(
-                        `✓ Makima hoş geldin: ${member.user.tag} → ${member.guild.name}`
+                        `✓ ${member.user.tag} sunucuya katıldı.`
                     );
 
                 } catch (error) {
 
                     console.error(
-                        `[Hoş Geldin] ${error.stack || error.message}`
+                        "❌ Hoş geldin sistemi hatası:",
+                        error
                     );
                 }
             }
         );
 
         // =================================================
-        // GÖRÜŞÜRÜZ
+        // ÜYE AYRILDI
         // =================================================
 
         client.on(
             "guildMemberRemove",
             async member => {
 
-                const db =
-                    getData();
-
-                const ayar =
-                    db[member.guild.id];
-
-                if (!ayar) {
-                    return;
-                }
-
-                if (
-                    !ayar.leaveEnabled
-                ) {
-                    return;
-                }
-
-                if (
-                    !ayar.leaveChannel
-                ) {
-                    return;
-                }
-
-                const channel =
-                    member.guild.channels.cache.get(
-                        ayar.leaveChannel
-                    );
-
-                if (!channel) {
-                    return;
-                }
-
                 try {
 
-                    const image =
+                    const data =
+                        getData();
+
+                    const guildData =
+                        data[member.guild.id];
+
+                    if (
+                        !guildData ||
+                        !guildData.enabled ||
+                        !guildData.channel
+                    ) {
+                        return;
+                    }
+
+                    const channel =
+                        member.guild.channels.cache.get(
+                            guildData.channel
+                        );
+
+                    if (!channel) {
+                        return;
+                    }
+
+                    const buffer =
                         await createImage(
                             member,
                             "goodbye"
@@ -1186,7 +981,7 @@ module.exports = {
 
                     const attachment =
                         new AttachmentBuilder(
-                            image,
+                            buffer,
                             {
                                 name:
                                     "makima-goodbye.png"
@@ -1195,82 +990,39 @@ module.exports = {
 
                     const embed =
                         new EmbedBuilder()
-                            .setColor(
-                                0xE31C23
-                            )
-                            .setTitle(
-                                "🚪 Görüşürüz!"
-                            )
-                            .setDescription(
-                                `**${member.user.username}** sunucumuzdan ayrıldı.\n` +
-                                `**${member.guild.name}** ailesine tekrar bekleriz. ❤️`
-                            )
-                            .setThumbnail(
-                                member.user.displayAvatarURL({
-                                    size: 256
-                                })
-                            )
+                            .setColor("#9e0000")
                             .setImage(
                                 "attachment://makima-goodbye.png"
                             )
-                            .addFields(
-                                {
-                                    name: "👤 Kullanıcı",
-                                    value:
-                                        `\`${member.user.username}\`\n` +
-                                        `ID: \`${member.id}\``,
-                                    inline: true
-                                },
-                                {
-                                    name: "👥 Kalan Üye",
-                                    value:
-                                        member.guild.memberCount
-                                            .toLocaleString("tr-TR"),
-                                    inline: true
-                                },
-                                {
-                                    name: "📅 Hesap Yaşı",
-                                    value:
-                                        getAccountAge(
-                                            member.user.createdTimestamp
-                                        ),
-                                    inline: true
-                                }
-                            )
                             .setFooter({
                                 text:
-                                    "Mion • Makima • Görüşürüz ❤️"
+                                    `${member.guild.name} • Mion`
                             })
                             .setTimestamp();
 
                     await channel.send({
-                        embeds: [
-                            embed
-                        ],
-                        files: [
-                            attachment
-                        ]
+                        content:
+                            `👋 ${member.user.username} sunucudan ayrıldı.`,
+                        embeds: [embed],
+                        files: [attachment]
                     });
 
                     console.log(
-                        `✓ Makima görüşürüz: ${member.user.tag} → ${member.guild.name}`
+                        `✓ ${member.user.tag} sunucudan ayrıldı.`
                     );
 
                 } catch (error) {
 
                     console.error(
-                        `[Görüşürüz] ${error.stack || error.message}`
+                        "❌ Görüşürüz sistemi hatası:",
+                        error
                     );
                 }
             }
         );
 
-        // =================================================
-        // SISTEM
-        // =================================================
-
         console.log(
-            "✓ Mion • Makima Hoş Geldin / Görüşürüz sistemi aktif."
+            "✓ Makima hoş geldin/görüşürüz sistemi aktif."
         );
     }
 };

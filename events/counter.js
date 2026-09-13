@@ -10,55 +10,89 @@ const path = require("path");
 // DOSYA
 // =====================================================
 
-const dataFolder = path.join(__dirname, "..", "data");
-const filePath = path.join(dataFolder, "counter.json");
+const dataFolder = path.join(
+    __dirname,
+    "..",
+    "data"
+);
+
+const filePath = path.join(
+    dataFolder,
+    "counter.json"
+);
 
 if (!fs.existsSync(dataFolder)) {
-    fs.mkdirSync(dataFolder, { recursive: true });
+    fs.mkdirSync(dataFolder, {
+        recursive: true
+    });
 }
 
-const DEFAULT_DATA = {};
-
 // =====================================================
-// DATA OKUMA
+// DATA
 // =====================================================
 
 function readData() {
+
     try {
+
         if (!fs.existsSync(filePath)) {
+
             fs.writeFileSync(
                 filePath,
-                JSON.stringify(DEFAULT_DATA, null, 4)
+                "{}",
+                "utf8"
             );
 
             return {};
         }
 
-        const raw = fs.readFileSync(filePath, "utf8").trim();
+        const raw =
+            fs.readFileSync(
+                filePath,
+                "utf8"
+            ).trim();
 
         if (!raw) {
             return {};
         }
 
         return JSON.parse(raw);
+
     } catch (error) {
-        console.error("❌ counter.json okunamadı:", error);
+
+        console.error(
+            "❌ counter.json okunamadı:",
+            error
+        );
+
         return {};
     }
 }
 
 // =====================================================
-// DATA KAYDETME
+// DATA KAYDET
 // =====================================================
 
 function saveData(data) {
+
     try {
+
         fs.writeFileSync(
             filePath,
-            JSON.stringify(data, null, 4)
+            JSON.stringify(
+                data,
+                null,
+                4
+            ),
+            "utf8"
         );
+
     } catch (error) {
-        console.error("❌ counter.json kaydedilemedi:", error);
+
+        console.error(
+            "❌ counter.json kaydedilemedi:",
+            error
+        );
     }
 }
 
@@ -67,136 +101,247 @@ function saveData(data) {
 // =====================================================
 
 function formatNumber(number) {
-    return Number(number || 0).toLocaleString("tr-TR");
+
+    return Number(
+        number || 0
+    ).toLocaleString("tr-TR");
 }
 
 // =====================================================
-// İLERLEME ÇUBUĞU
+// PROGRESS BAR
 // =====================================================
 
-function progressBar(current, target, size = 20) {
-    if (!target || target <= 0) {
+function progressBar(
+    current,
+    target,
+    size = 20
+) {
+
+    if (
+        !target ||
+        target <= 0
+    ) {
+
         return "━━━━━━━━━━━━━━━━━━━━";
     }
 
-    const percentage = Math.min(
-        Math.max(current / target, 0),
-        1
+    const percentage =
+        Math.min(
+            Math.max(
+                current / target,
+                0
+            ),
+            1
+        );
+
+    const filled =
+        Math.round(
+            percentage * size
+        );
+
+    const empty =
+        size - filled;
+
+    return (
+        "█".repeat(filled) +
+        "░".repeat(empty)
     );
-
-    const filled = Math.round(percentage * size);
-    const empty = size - filled;
-
-    return "█".repeat(filled) + "░".repeat(empty);
 }
 
 // =====================================================
 // YÜZDE
 // =====================================================
 
-function getPercentage(current, target) {
-    if (!target || target <= 0) {
+function getPercentage(
+    current,
+    target
+) {
+
+    if (
+        !target ||
+        target <= 0
+    ) {
+
         return 0;
     }
 
     return Math.min(
-        Math.round((current / target) * 100),
+        Math.round(
+            (current / target) * 100
+        ),
         100
     );
 }
 
 // =====================================================
-// ÜYE SAYISI MESAJI
+// BOT YETKİ KONTROLÜ
 // =====================================================
 
-async function sendCounterMessage(guild, member, type) {
-    const data = readData();
+function checkPermissions(
+    channel,
+    guild
+) {
 
-    const ayar = data[guild.id];
+    const me =
+        guild.members.me;
 
-    if (!ayar) return;
-    if (!ayar.enabled) return;
-    if (!ayar.channelId) return;
+    if (!me) {
+
+        console.log(
+            `⚠️ ${guild.name} → Bot üyesi bulunamadı.`
+        );
+
+        return false;
+    }
+
+    const permissions =
+        channel.permissionsFor(me);
+
+    if (!permissions) {
+
+        console.log(
+            `⚠️ ${guild.name} → Yetkiler okunamadı.`
+        );
+
+        return false;
+    }
+
+    const required = [
+        PermissionsBitField.Flags.ViewChannel,
+        PermissionsBitField.Flags.SendMessages,
+        PermissionsBitField.Flags.EmbedLinks
+    ];
+
+    for (
+        const permission of required
+    ) {
+
+        if (
+            !permissions.has(permission)
+        ) {
+
+            console.log(
+                `⚠️ ${guild.name} → Sayaç kanalında gerekli yetki eksik.`
+            );
+
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// =====================================================
+// COUNTER MESAJI
+// =====================================================
+
+async function sendCounterMessage(
+    guild,
+    member,
+    type
+) {
+
+    const data =
+        readData();
+
+    const ayar =
+        data[guild.id];
+
+    // Sistem kapalı
+    if (!ayar) {
+        return;
+    }
+
+    if (!ayar.enabled) {
+        return;
+    }
+
+    if (!ayar.channelId) {
+        return;
+    }
 
     // =================================================
     // KANAL
     // =================================================
 
-    const channel = guild.channels.cache.get(ayar.channelId);
+    const channel =
+        guild.channels.cache.get(
+            ayar.channelId
+        );
 
     if (!channel) {
+
         console.log(
-            `⚠️ ${guild.name} sunucusunda sayaç kanalı bulunamadı.`
+            `⚠️ ${guild.name} → Sayaç kanalı bulunamadı.`
         );
 
         return;
     }
 
     // =================================================
-    // KANAL KONTROL
+    // TEXT KANAL KONTROLÜ
     // =================================================
 
     if (!channel.isTextBased()) {
+
         console.log(
-            `⚠️ ${guild.name} sunucusunda sayaç kanalı mesaj desteklemiyor.`
+            `⚠️ ${guild.name} → Sayaç kanalı mesaj desteklemiyor.`
         );
 
         return;
     }
 
     // =================================================
-    // BOT YETKİLERİ
+    // YETKİ
     // =================================================
-
-    const permissions = channel.permissionsFor(guild.members.me);
 
     if (
-        !permissions ||
-        !permissions.has(
-            PermissionsBitField.Flags.ViewChannel
-        ) ||
-        !permissions.has(
-            PermissionsBitField.Flags.SendMessages
-        ) ||
-        !permissions.has(
-            PermissionsBitField.Flags.EmbedLinks
+        !checkPermissions(
+            channel,
+            guild
         )
     ) {
-        console.log(
-            `⚠️ ${guild.name} - Sayaç kanalında gerekli yetkiler yok.`
-        );
 
         return;
     }
 
     // =================================================
-    // GÜNCEL ÜYE SAYISI
+    // GÜNCEL ÜYE
     // =================================================
 
-    const current = guild.memberCount;
+    const current =
+        guild.memberCount;
 
-    const target = Number(ayar.target) || 0;
+    const target =
+        Number(
+            ayar.target
+        ) || 0;
 
-    const percentage = getPercentage(
-        current,
-        target
-    );
+    const percentage =
+        getPercentage(
+            current,
+            target
+        );
 
-    const bar = progressBar(
-        current,
-        target
-    );
+    const bar =
+        progressBar(
+            current,
+            target
+        );
 
     // =================================================
-    // ÜYE GİRİŞ / ÇIKIŞ
+    // MESAJ
     // =================================================
 
     let title;
     let description;
 
-    if (type === "join") {
+    if (
+        type === "join"
+    ) {
 
-        title = "👋 Yeni Üye Katıldı";
+        title =
+            "👋 Yeni Üye Katıldı";
 
         description =
             `${member} sunucuya katıldı!\n\n` +
@@ -205,7 +350,8 @@ async function sendCounterMessage(guild, member, type) {
 
     } else {
 
-        title = "👋 Üye Ayrıldı";
+        title =
+            "🚪 Üye Ayrıldı";
 
         description =
             `**${member.user.tag}** sunucudan ayrıldı.\n\n` +
@@ -213,19 +359,24 @@ async function sendCounterMessage(guild, member, type) {
     }
 
     // =================================================
-    // HEDEF BİLGİSİ
+    // HEDEF
     // =================================================
 
     let targetText;
 
-    if (target > 0) {
+    if (
+        target > 0
+    ) {
 
-        const remaining = Math.max(
-            target - current,
-            0
-        );
+        const remaining =
+            Math.max(
+                target - current,
+                0
+            );
 
-        if (current >= target) {
+        if (
+            current >= target
+        ) {
 
             targetText =
                 `🎯 **Hedef:** ${formatNumber(target)}\n` +
@@ -243,36 +394,46 @@ async function sendCounterMessage(guild, member, type) {
     } else {
 
         targetText =
-            `🎯 **Hedef:** Ayarlanmamış`;
+            "🎯 **Hedef:** Ayarlanmamış";
     }
 
     // =================================================
     // EMBED
     // =================================================
 
-    const embed = new EmbedBuilder()
-        .setColor(0x000000)
-        .setTitle(title)
-        .setDescription(description)
-        .addFields(
-            {
-                name: "👥 Güncel Üye Sayısı",
-                value: `**${formatNumber(current)}**`,
-                inline: true
-            },
-            {
-                name: "📊 Sayaç",
-                value: targetText,
-                inline: false
-            }
-        )
-        .setFooter({
-            text: `${guild.name} • Sayaç Sistemi`
-        })
-        .setTimestamp();
+    const embed =
+        new EmbedBuilder()
+            .setColor(0x000000)
+            .setTitle(title)
+            .setDescription(description)
+            .addFields(
+                {
+                    name: "👥 Güncel Üye Sayısı",
+                    value:
+                        `**${formatNumber(current)}**`,
+                    inline: true
+                },
+                {
+                    name: "📊 Sayaç",
+                    value: targetText,
+                    inline: false
+                }
+            )
+            .setFooter({
+                text:
+                    `${guild.name} • Mion Sayaç Sistemi`
+            })
+            .setTimestamp();
 
-    // Kullanıcı avatarı varsa thumbnail
-    if (member.user?.displayAvatarURL) {
+    // =================================================
+    // AVATAR
+    // =================================================
+
+    if (
+        member.user &&
+        member.user.displayAvatarURL
+    ) {
+
         embed.setThumbnail(
             member.user.displayAvatarURL({
                 extension: "png",
@@ -288,7 +449,9 @@ async function sendCounterMessage(guild, member, type) {
     try {
 
         await channel.send({
-            embeds: [embed]
+            embeds: [
+                embed
+            ]
         });
 
     } catch (error) {
@@ -297,6 +460,8 @@ async function sendCounterMessage(guild, member, type) {
             `❌ ${guild.name} sayaç mesajı gönderilemedi:`,
             error
         );
+
+        return;
     }
 
     // =================================================
@@ -313,46 +478,58 @@ async function sendCounterMessage(guild, member, type) {
 
         saveData(data);
 
-        const targetEmbed = new EmbedBuilder()
-            .setColor(0x000000)
-            .setTitle("🎉 Sayaç Hedefine Ulaşıldı!")
-            .setDescription(
-                `Sunucu **${formatNumber(target)}** üye hedefine ulaştı!\n\n` +
-                `👥 **Güncel Üye:** ${formatNumber(current)}\n` +
-                `🎯 **Hedef:** ${formatNumber(target)}\n\n` +
-                `${progressBar(current, target)} **%100**`
-            )
-            .setFooter({
-                text: `${guild.name} • Sayaç Sistemi`
-            })
-            .setTimestamp();
+        const targetEmbed =
+            new EmbedBuilder()
+                .setColor(0x000000)
+                .setTitle(
+                    "🎉 Sayaç Hedefine Ulaşıldı!"
+                )
+                .setDescription(
+                    `Sunucu **${formatNumber(target)}** üye hedefine ulaştı!\n\n` +
+                    `👥 **Güncel Üye:** ${formatNumber(current)}\n` +
+                    `🎯 **Hedef:** ${formatNumber(target)}\n\n` +
+                    `${progressBar(current, target)} **%100**`
+                )
+                .setFooter({
+                    text:
+                        `${guild.name} • Mion Sayaç Sistemi`
+                })
+                .setTimestamp();
 
         try {
 
             await channel.send({
-                embeds: [targetEmbed]
+                embeds: [
+                    targetEmbed
+                ]
             });
 
         } catch (error) {
 
             console.error(
-                `❌ ${guild.name} hedef mesajı gönderilemedi:`,
+                "❌ Hedef mesajı gönderilemedi:",
                 error
             );
         }
+    }
 
-    } else if (
+    // =================================================
+    // HEDEFTEN DÜŞÜLDÜ
+    // =================================================
+
+    else if (
         target > 0 &&
         current < target &&
         ayar.reached
     ) {
 
-        // Hedeften tekrar aşağı düşüldüyse
-        // reached durumunu sıfırla.
-
         ayar.reached = false;
 
         saveData(data);
+
+        console.log(
+            `↩️ ${guild.name} → Sayaç hedef durumundan çıktı.`
+        );
     }
 }
 
