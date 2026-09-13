@@ -1,3 +1,4 @@
+
 const {
     EmbedBuilder,
     PermissionsBitField,
@@ -6,6 +7,10 @@ const {
 
 const fs = require("fs");
 const path = require("path");
+
+// =====================================================
+// DOSYALAR
+// =====================================================
 
 const dataDir = path.join(__dirname, "..", "data");
 const dataFile = path.join(dataDir, "security.json");
@@ -17,32 +22,11 @@ if (!fs.existsSync(dataDir)) {
 }
 
 if (!fs.existsSync(dataFile)) {
-    fs.writeFileSync(dataFile, "{}");
-}
-
-// =====================================================
-// DATA
-// =====================================================
-
-function loadData() {
-    try {
-        return JSON.parse(
-            fs.readFileSync(dataFile, "utf8")
-        );
-    } catch {
-        return {};
-    }
-}
-
-function saveData(data) {
-    try {
-        fs.writeFileSync(
-            dataFile,
-            JSON.stringify(data, null, 4)
-        );
-    } catch (error) {
-        console.error("Security data kaydedilemedi:", error);
-    }
+    fs.writeFileSync(
+        dataFile,
+        "{}",
+        "utf8"
+    );
 }
 
 // =====================================================
@@ -118,16 +102,142 @@ function defaultConfig() {
 }
 
 // =====================================================
-// CONFIG
+// CONFIG MERGE
+// =====================================================
+
+function mergeConfig(config = {}) {
+
+    const defaults = defaultConfig();
+
+    return {
+        ...defaults,
+        ...config,
+
+        antiSpam: {
+            ...defaults.antiSpam,
+            ...(config.antiSpam || {})
+        },
+
+        antiFlood: {
+            ...defaults.antiFlood,
+            ...(config.antiFlood || {})
+        },
+
+        antiLink: {
+            ...defaults.antiLink,
+            ...(config.antiLink || {})
+        },
+
+        antiAd: {
+            ...defaults.antiAd,
+            ...(config.antiAd || {})
+        },
+
+        antiMention: {
+            ...defaults.antiMention,
+            ...(config.antiMention || {})
+        },
+
+        antiRaid: {
+            ...defaults.antiRaid,
+            ...(config.antiRaid || {})
+        },
+
+        antiBot: {
+            ...defaults.antiBot,
+            ...(config.antiBot || {})
+        },
+
+        antiNuke: {
+            ...defaults.antiNuke,
+            ...(config.antiNuke || {})
+        },
+
+        whitelist: {
+            ...defaults.whitelist,
+            ...(config.whitelist || {})
+        }
+    };
+}
+
+// =====================================================
+// DATA OKU
+// =====================================================
+
+function loadData() {
+
+    try {
+
+        const raw =
+            fs.readFileSync(
+                dataFile,
+                "utf8"
+            );
+
+        if (!raw.trim()) {
+            return {};
+        }
+
+        return JSON.parse(raw);
+
+    } catch (error) {
+
+        console.error(
+            "❌ Security data okunamadı:",
+            error
+        );
+
+        return {};
+    }
+}
+
+// =====================================================
+// DATA KAYDET
+// =====================================================
+
+function saveData(data) {
+
+    try {
+
+        fs.writeFileSync(
+            dataFile,
+            JSON.stringify(
+                data,
+                null,
+                4
+            ),
+            "utf8"
+        );
+
+    } catch (error) {
+
+        console.error(
+            "❌ Security data kaydedilemedi:",
+            error
+        );
+    }
+}
+
+// =====================================================
+// CONFIG AL
 // =====================================================
 
 function getConfig(guildId) {
+
     const data = loadData();
 
     if (!data[guildId]) {
-        data[guildId] = defaultConfig();
+
+        data[guildId] =
+            defaultConfig();
+
         saveData(data);
     }
+
+    data[guildId] =
+        mergeConfig(
+            data[guildId]
+        );
 
     return data[guildId];
 }
@@ -137,26 +247,41 @@ function getConfig(guildId) {
 // =====================================================
 
 function isWhitelisted(member, config) {
-    if (!member) return false;
 
-    if (member.id === member.guild.ownerId) {
-        return true;
+    if (!member) {
+        return false;
     }
 
+    // Sunucu sahibi
     if (
-        config.whitelist?.users?.includes(member.id)
+        member.id ===
+        member.guild.ownerId
     ) {
         return true;
     }
 
+    // Kullanıcı whitelist
     if (
-        member.roles.cache.some(role =>
-            config.whitelist?.roles?.includes(role.id)
+        config.whitelist?.users?.includes(
+            member.id
         )
     ) {
         return true;
     }
 
+    // Rol whitelist
+    if (
+        member.roles?.cache?.some(
+            role =>
+                config.whitelist?.roles?.includes(
+                    role.id
+                )
+        )
+    ) {
+        return true;
+    }
+
+    // Administrator
     if (
         member.permissions.has(
             PermissionsBitField.Flags.Administrator
@@ -177,37 +302,60 @@ async function securityLog(
     config,
     title,
     description,
-    member
+    member = null
 ) {
-    if (!config.logChannel) return;
+
+    if (!config.logChannel) {
+        return;
+    }
 
     const channel =
-        guild.channels.cache.get(config.logChannel);
+        guild.channels.cache.get(
+            config.logChannel
+        );
 
-    if (!channel || !channel.isTextBased()) return;
+    if (
+        !channel ||
+        !channel.isTextBased()
+    ) {
+        return;
+    }
 
-    const embed = new EmbedBuilder()
-        .setColor("#FF4D6D")
-        .setTitle(title)
-        .setDescription(description)
-        .setTimestamp()
-        .setFooter({
-            text: "Mion Security"
-        });
+    const embed =
+        new EmbedBuilder()
+            .setColor(0x000000)
+            .setTitle(title)
+            .setDescription(description)
+            .setTimestamp()
+            .setFooter({
+                text:
+                    "Mion • Security"
+            });
 
     if (member) {
+
         embed.addFields({
-            name: "Kullanıcı",
-            value: `${member.user?.tag || member.tag || "Bilinmiyor"}\n\`${member.id}\``,
+            name: "👤 Kullanıcı",
+            value:
+                `${member.user?.tag || member.tag || "Bilinmiyor"}\n` +
+                `\`${member.id}\``,
             inline: false
         });
     }
 
     try {
+
         await channel.send({
             embeds: [embed]
         });
-    } catch {}
+
+    } catch (error) {
+
+        console.error(
+            "❌ Security log gönderilemedi:",
+            error.message
+        );
+    }
 }
 
 // =====================================================
@@ -219,6 +367,7 @@ async function timeoutMember(
     minutes,
     reason
 ) {
+
     if (!member) {
         return false;
     }
@@ -228,129 +377,313 @@ async function timeoutMember(
     }
 
     try {
+
         await member.timeout(
-            minutes * 60 * 1000,
-            reason
+            Math.max(1, minutes) * 60 * 1000,
+            `Mion Security: ${reason}`
         );
 
         return true;
+
     } catch {
+
         return false;
     }
 }
 
 // =====================================================
-// MESSAGE CHECKS
-// =====================================================
-
-function containsLink(content) {
-    return /(https?:\/\/|www\.|discord\.gg\/|discord\.com\/invite\/)/i
-        .test(content);
-}
-
-function containsDiscordInvite(content) {
-    return /(discord\.gg\/|discord\.com\/invite\/)/i
-        .test(content);
-}
-
-function containsAdvertisement(content) {
-    const patterns = [
-        /https?:\/\/\S+/i,
-        /discord\.gg\/\S+/i,
-        /sunucumuza katıl/i,
-        /sunucumuza bekleriz/i,
-        /dm.*gel/i,
-        /özelden.*yaz/i,
-        /reklam/i
-    ];
-
-    return patterns.some(regex =>
-        regex.test(content)
-    );
-}
-
-function containsMassMention(message, config) {
-    const everyone =
-        message.mentions.everyone ? 1 : 0;
-
-    const users =
-        message.mentions.users.size;
-
-    return (
-        everyone >=
-            config.antiMention.maxEveryone ||
-        users >=
-            config.antiMention.maxMentions
-    );
-}
-
-// =====================================================
-// PUNISH MESSAGE
+// MESAJ SİL + TIMEOUT
 // =====================================================
 
 async function punishMessage(
     message,
     reason,
-    timeoutMinutes = 10
+    timeoutMinutes
 ) {
+
     let deleted = false;
     let timeout = false;
 
     try {
+
         await message.delete();
+
         deleted = true;
+
     } catch {}
 
     if (message.member) {
-        timeout = await timeoutMember(
-            message.member,
-            timeoutMinutes,
-            `Mion Security: ${reason}`
-        );
+
+        timeout =
+            await timeoutMember(
+                message.member,
+                timeoutMinutes,
+                reason
+            );
     }
 
     return {
         deleted,
-        timeout,
-        reason
+        timeout
     };
 }
 
 // =====================================================
-// TRACKERS
+// LINK
 // =====================================================
 
-const messageTracker = new Map();
-const messageFloodTracker = new Map();
-const raidTracker = new Map();
-const nukeTracker = new Map();
+function containsLink(content) {
+
+    return /(https?:\/\/|www\.|discord\.gg\/|discord\.com\/invite\/)/i
+        .test(content);
+}
+
+// =====================================================
+// DISCORD DAVETİ
+// =====================================================
+
+function containsDiscordInvite(content) {
+
+    return /(discord\.gg\/|discord\.com\/invite\/)/i
+        .test(content);
+}
+
+// =====================================================
+// REKLAM
+// =====================================================
+
+function containsAdvertisement(content) {
+
+    const patterns = [
+
+        /https?:\/\/\S+/i,
+
+        /www\.\S+/i,
+
+        /discord\.gg\/\S+/i,
+
+        /discord\.com\/invite\/\S+/i,
+
+        /sunucumuza\s+katıl/i,
+
+        /sunucumuza\s+bekleriz/i,
+
+        /sunucuma\s+katıl/i,
+
+        /dm.*gel/i,
+
+        /dmden.*yaz/i,
+
+        /özelden.*yaz/i,
+
+        /reklam/i
+    ];
+
+    return patterns.some(
+        regex =>
+            regex.test(content)
+    );
+}
+
+// =====================================================
+// MENTION KONTROL
+// =====================================================
+
+function containsMassMention(
+    message,
+    config
+) {
+
+    const userMentions =
+        message.mentions.users.size;
+
+    const roleMentions =
+        message.mentions.roles.size;
+
+    const everyone =
+        message.mentions.everyone
+            ? 1
+            : 0;
+
+    if (
+        everyone >=
+        config.antiMention.maxEveryone
+    ) {
+        return true;
+    }
+
+    if (
+        userMentions >=
+        config.antiMention.maxMentions
+    ) {
+        return true;
+    }
+
+    if (
+        roleMentions >=
+        config.antiMention.maxMentions
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
+// =====================================================
+// TRACKER
+// =====================================================
+
+const spamTracker =
+    new Map();
+
+const floodTracker =
+    new Map();
+
+const raidTracker =
+    new Map();
+
+const nukeTracker =
+    new Map();
+
+const punishmentCooldown =
+    new Map();
+
+// =====================================================
+// TRACK ACTION
+// =====================================================
 
 function trackAction(
     map,
-    guildId,
-    userId,
-    action,
+    key,
     interval
 ) {
-    const key =
-        `${guildId}:${userId}:${action}`;
 
-    const now = Date.now();
+    const now =
+        Date.now();
 
     let timestamps =
         map.get(key) || [];
 
     timestamps =
         timestamps.filter(
-            time =>
-                now - time <= interval
+            timestamp =>
+                now - timestamp <=
+                interval
         );
 
     timestamps.push(now);
 
-    map.set(key, timestamps);
+    map.set(
+        key,
+        timestamps
+    );
 
     return timestamps.length;
+}
+
+// =====================================================
+// CEZA COOLDOWN
+// =====================================================
+
+function canPunish(
+    guildId,
+    userId,
+    type,
+    cooldown = 10000
+) {
+
+    const key =
+        `${guildId}:${userId}:${type}`;
+
+    const now =
+        Date.now();
+
+    const last =
+        punishmentCooldown.get(
+            key
+        );
+
+    if (
+        last &&
+        now - last <
+        cooldown
+    ) {
+        return false;
+    }
+
+    punishmentCooldown.set(
+        key,
+        now
+    );
+
+    setTimeout(
+        () => {
+            punishmentCooldown.delete(
+                key
+            );
+        },
+        cooldown
+    );
+
+    return true;
+}
+
+// =====================================================
+// AUDIT LOG EXECUTOR
+// =====================================================
+
+async function getAuditExecutor(
+    guild,
+    auditType,
+    targetId = null
+) {
+
+    try {
+
+        const logs =
+            await guild.fetchAuditLogs({
+                type: auditType,
+                limit: 5
+            });
+
+        const now =
+            Date.now();
+
+        const entry =
+            logs.entries.find(
+                entry => {
+
+                    if (
+                        now -
+                        entry.createdTimestamp >
+                        5000
+                    ) {
+                        return false;
+                    }
+
+                    if (
+                        targetId &&
+                        entry.target?.id &&
+                        entry.target.id !== targetId
+                    ) {
+                        return false;
+                    }
+
+                    return true;
+                }
+            );
+
+        return entry || null;
+
+    } catch (error) {
+
+        console.error(
+            "❌ Audit log alınamadı:",
+            error.message
+        );
+
+        return null;
+    }
 }
 
 // =====================================================
@@ -364,14 +697,24 @@ async function handleNuke(
     action,
     limit
 ) {
-    if (!executor) return;
+
+    if (!executor) {
+        return;
+    }
+
+    // Bot kendisi işlem yaptıysa
+    if (executor.bot) {
+        return;
+    }
 
     const member =
         guild.members.cache.get(
             executor.id
         );
 
-    if (!member) return;
+    if (!member) {
+        return;
+    }
 
     if (
         isWhitelisted(
@@ -382,12 +725,13 @@ async function handleNuke(
         return;
     }
 
+    const key =
+        `${guild.id}:${executor.id}:${action}`;
+
     const count =
         trackAction(
             nukeTracker,
-            guild.id,
-            executor.id,
-            action,
+            key,
             config.antiNuke.interval
         );
 
@@ -395,42 +739,152 @@ async function handleNuke(
         return;
     }
 
+    if (
+        !canPunish(
+            guild.id,
+            executor.id,
+            `nuke-${action}`,
+            config.antiNuke.interval
+        )
+    ) {
+        return;
+    }
+
     let punished = false;
 
+    // KICK
     if (
         config.antiNuke.action === "kick" &&
         member.kickable
     ) {
+
         try {
+
             await member.kick(
                 `Mion Anti-Nuke: ${action}`
             );
 
             punished = true;
+
         } catch {}
     }
 
     await securityLog(
         guild,
         config,
+
         "🚨 ANTI-NUKE TETİKLENDİ",
 
-        `**${executor.tag}** tarafından kısa sürede çok fazla **${action}** işlemi algılandı.\n\n` +
+        `**${executor.tag}** kısa sürede çok fazla **${action}** işlemi gerçekleştirdi.\n\n` +
+
         `📊 İşlem sayısı: **${count}**\n` +
-        `⚔️ Uygulanan işlem: **${
+
+        `⏱️ Aralık: **${config.antiNuke.interval / 1000} saniye**\n` +
+
+        `🔨 Ceza: **${
             punished
                 ? "Kick"
-                : "İşlem uygulanamadı"
+                : "Uygulanamadı"
         }**`,
 
         member
     );
 
-    // Aynı kişiyi sürekli cezalandırmasını engelle
     nukeTracker.delete(
-        `${guild.id}:${executor.id}:${action}`
+        key
     );
 }
+
+// =====================================================
+// TEMİZLİK
+// =====================================================
+
+setInterval(
+    () => {
+
+        const now =
+            Date.now();
+
+        for (
+            const [key, timestamps]
+            of spamTracker
+        ) {
+
+            const filtered =
+                timestamps.filter(
+                    time =>
+                        now - time < 30000
+                );
+
+            if (
+                filtered.length === 0
+            ) {
+                spamTracker.delete(
+                    key
+                );
+            } else {
+                spamTracker.set(
+                    key,
+                    filtered
+                );
+            }
+        }
+
+        for (
+            const [key, entries]
+            of floodTracker
+        ) {
+
+            const filtered =
+                entries.filter(
+                    entry =>
+                        now - entry.time <
+                        30000
+                );
+
+            if (
+                filtered.length === 0
+            ) {
+                floodTracker.delete(
+                    key
+                );
+            } else {
+                floodTracker.set(
+                    key,
+                    filtered
+                );
+            }
+        }
+
+        for (
+            const [guildId, joins]
+            of raidTracker
+        ) {
+
+            const filtered =
+                joins.filter(
+                    time =>
+                        now - time <
+                        60000
+                );
+
+            if (
+                filtered.length === 0
+            ) {
+                raidTracker.delete(
+                    guildId
+                );
+            } else {
+                raidTracker.set(
+                    guildId,
+                    filtered
+                );
+            }
+        }
+
+    },
+    60000
+);
 
 // =====================================================
 // MODULE
@@ -443,240 +897,118 @@ module.exports = {
     register(client) {
 
         // =================================================
-        // MESAJ KORUMASI
+        // MESSAGE CREATE
         // =================================================
 
         client.on(
             "messageCreate",
             async message => {
 
-                if (!message.guild) return;
-                if (message.author.bot) return;
-
-                const config =
-                    getConfig(
-                        message.guild.id
-                    );
-
-                if (!config.enabled) return;
-
-                const member =
-                    message.member;
-
-                if (
-                    isWhitelisted(
-                        member,
-                        config
-                    )
-                ) {
-                    return;
-                }
-
-                const userId =
-                    message.author.id;
-
-                // =================================================
-                // SPAM
-                // =================================================
-
-                if (
-                    config.antiSpam.enabled
-                ) {
-
-                    const key =
-                        `${message.guild.id}:${userId}`;
-
-                    const now =
-                        Date.now();
-
-                    let messages =
-                        messageTracker.get(
-                            key
-                        ) || [];
-
-                    messages =
-                        messages.filter(
-                            time =>
-                                now - time <=
-                                config.antiSpam.interval
-                        );
-
-                    messages.push(now);
-
-                    messageTracker.set(
-                        key,
-                        messages
-                    );
+                try {
 
                     if (
-                        messages.length >=
-                        config.antiSpam.maxMessages
+                        !message.guild ||
+                        message.author.bot
                     ) {
-
-                        const punishment =
-                            await punishMessage(
-                                message,
-                                "Spam",
-                                config.antiSpam.timeout
-                            );
-
-                        messageTracker.delete(
-                            key
-                        );
-
-                        await securityLog(
-                            message.guild,
-                            config,
-                            "🚨 SPAM ALGILANDI",
-
-                            `**${message.author.tag}** kısa sürede çok fazla mesaj gönderdi.\n\n` +
-                            `📊 Mesaj sayısı: **${messages.length}**\n` +
-                            `⏱️ Süre: **${config.antiSpam.interval / 1000} saniye**\n` +
-                            `🔨 Ceza: **${
-                                punishment.timeout
-                                    ? `${config.antiSpam.timeout} dakika timeout`
-                                    : "Timeout uygulanamadı"
-                            }**`,
-
-                            member
-                        );
-
                         return;
                     }
-                }
 
-                // =================================================
-                // FLOOD
-                // =================================================
-
-                if (
-                    config.antiFlood.enabled
-                ) {
-
-                    const key =
-                        `${message.guild.id}:${userId}:flood`;
-
-                    const now =
-                        Date.now();
-
-                    let entries =
-                        messageFloodTracker.get(
-                            key
-                        ) || [];
-
-                    entries =
-                        entries.filter(
-                            item =>
-                                now - item.time <=
-                                config.antiFlood.interval
+                    const config =
+                        getConfig(
+                            message.guild.id
                         );
-
-                    const content =
-                        message.content
-                            .toLowerCase()
-                            .trim();
-
-                    entries.push({
-                        content,
-                        time: now
-                    });
-
-                    messageFloodTracker.set(
-                        key,
-                        entries
-                    );
-
-                    const sameCount =
-                        entries.filter(
-                            item =>
-                                item.content ===
-                                content
-                        ).length;
 
                     if (
-                        sameCount >=
-                        config.antiFlood.maxDuplicates
+                        !config.enabled
                     ) {
-
-                        const punishment =
-                            await punishMessage(
-                                message,
-                                "Flood",
-                                config.antiFlood.timeout
-                            );
-
-                        messageFloodTracker.delete(
-                            key
-                        );
-
-                        await securityLog(
-                            message.guild,
-                            config,
-                            "🌊 FLOOD ALGILANDI",
-
-                            `**${message.author.tag}** aynı mesajı tekrar tekrar gönderdi.\n\n` +
-                            `🔨 Ceza: **${
-                                punishment.timeout
-                                    ? `${config.antiFlood.timeout} dakika timeout`
-                                    : "Timeout uygulanamadı"
-                            }**`,
-
-                            member
-                        );
-
                         return;
                     }
-                }
 
-                // =================================================
-                // LINK
-                // =================================================
-
-                if (
-                    config.antiLink.enabled
-                ) {
+                    const member =
+                        message.member;
 
                     if (
-                        containsLink(
-                            message.content
+                        !member ||
+                        isWhitelisted(
+                            member,
+                            config
                         )
                     ) {
+                        return;
+                    }
 
-                        const isDiscord =
-                            containsDiscordInvite(
-                                message.content
-                            );
+                    const guildId =
+                        message.guild.id;
 
-                        const allowed =
-                            config.antiLink.whitelist.some(
-                                domain =>
-                                    message.content
-                                        .toLowerCase()
-                                        .includes(
-                                            domain.toLowerCase()
-                                        )
+                    const userId =
+                        message.author.id;
+
+                    // =============================================
+                    // ANTI SPAM
+                    // =============================================
+
+                    if (
+                        config.antiSpam.enabled
+                    ) {
+
+                        const key =
+                            `${guildId}:${userId}`;
+
+                        const count =
+                            trackAction(
+                                spamTracker,
+                                key,
+                                config.antiSpam.interval
                             );
 
                         if (
-                            !allowed &&
-                            (
-                                !isDiscord ||
-                                !config.antiLink.allowDiscord
-                            )
+                            count >=
+                            config.antiSpam.maxMessages
                         ) {
 
-                            await punishMessage(
-                                message,
-                                "İzinsiz link",
-                                10
+                            if (
+                                !canPunish(
+                                    guildId,
+                                    userId,
+                                    "spam"
+                                )
+                            ) {
+                                return;
+                            }
+
+                            const punishment =
+                                await punishMessage(
+                                    message,
+                                    "Spam",
+                                    config.antiSpam.timeout
+                                );
+
+                            spamTracker.delete(
+                                key
                             );
 
                             await securityLog(
                                 message.guild,
                                 config,
-                                "🔗 İZİNSİZ LİNK",
+                                "🚨 ANTI-SPAM",
 
-                                `**${message.author.tag}** izinsiz bir link gönderdi.`,
+                                `**${message.author.tag}** kısa sürede çok fazla mesaj gönderdi.\n\n` +
+
+                                `📊 Mesaj: **${count}**\n` +
+
+                                `⏱️ Süre: **${config.antiSpam.interval / 1000} saniye**\n` +
+
+                                `🗑️ Mesaj silindi: **${
+                                    punishment.deleted
+                                        ? "Evet"
+                                        : "Hayır"
+                                }**\n` +
+
+                                `🔨 Timeout: **${
+                                    punishment.timeout
+                                        ? `${config.antiSpam.timeout} dakika`
+                                        : "Uygulanamadı"
+                                }**`,
 
                                 member
                             );
@@ -684,273 +1016,551 @@ module.exports = {
                             return;
                         }
                     }
-                }
 
-                // =================================================
-                // REKLAM
-                // =================================================
-
-                if (
-                    config.antiAd.enabled
-                ) {
+                    // =============================================
+                    // ANTI FLOOD
+                    // =============================================
 
                     if (
+                        config.antiFlood.enabled &&
+                        message.content.trim()
+                    ) {
+
+                        const key =
+                            `${guildId}:${userId}`;
+
+                        const now =
+                            Date.now();
+
+                        let entries =
+                            floodTracker.get(
+                                key
+                            ) || [];
+
+                        entries =
+                            entries.filter(
+                                item =>
+                                    now - item.time <=
+                                    config.antiFlood.interval
+                            );
+
+                        const content =
+                            message.content
+                                .toLowerCase()
+                                .replace(
+                                    /\s+/g,
+                                    " "
+                                )
+                                .trim();
+
+                        entries.push({
+                            content,
+                            time: now
+                        });
+
+                        floodTracker.set(
+                            key,
+                            entries
+                        );
+
+                        const duplicateCount =
+                            entries.filter(
+                                item =>
+                                    item.content ===
+                                    content
+                            ).length;
+
+                        if (
+                            duplicateCount >=
+                            config.antiFlood.maxDuplicates
+                        ) {
+
+                            if (
+                                !canPunish(
+                                    guildId,
+                                    userId,
+                                    "flood"
+                                )
+                            ) {
+                                return;
+                            }
+
+                            const punishment =
+                                await punishMessage(
+                                    message,
+                                    "Flood",
+                                    config.antiFlood.timeout
+                                );
+
+                            floodTracker.delete(
+                                key
+                            );
+
+                            await securityLog(
+                                message.guild,
+                                config,
+                                "🌊 ANTI-FLOOD",
+
+                                `**${message.author.tag}** aynı mesajı tekrar tekrar gönderdi.\n\n` +
+
+                                `🔁 Tekrar: **${duplicateCount}**\n` +
+
+                                `⏱️ Süre: **${config.antiFlood.interval / 1000} saniye**\n` +
+
+                                `🔨 Timeout: **${
+                                    punishment.timeout
+                                        ? `${config.antiFlood.timeout} dakika`
+                                        : "Uygulanamadı"
+                                }**`,
+
+                                member
+                            );
+
+                            return;
+                        }
+                    }
+
+                    // =============================================
+                    // ANTI LINK
+                    // =============================================
+
+                    if (
+                        config.antiLink.enabled &&
+                        containsLink(
+                            message.content
+                        )
+                    ) {
+
+                        const isDiscordInvite =
+                            containsDiscordInvite(
+                                message.content
+                            );
+
+                        const allowed =
+                            Array.isArray(
+                                config.antiLink.whitelist
+                            ) &&
+                            config.antiLink.whitelist.some(
+                                domain =>
+                                    message.content
+                                        .toLowerCase()
+                                        .includes(
+                                            String(domain)
+                                                .toLowerCase()
+                                        )
+                            );
+
+                        const blockedDiscord =
+                            isDiscordInvite &&
+                            !config.antiLink.allowDiscord;
+
+                        if (
+                            !allowed &&
+                            (
+                                !isDiscordInvite ||
+                                blockedDiscord
+                            )
+                        ) {
+
+                            if (
+                                !canPunish(
+                                    guildId,
+                                    userId,
+                                    "link"
+                                )
+                            ) {
+                                return;
+                            }
+
+                            const punishment =
+                                await punishMessage(
+                                    message,
+                                    "İzinsiz link",
+                                    10
+                                );
+
+                            await securityLog(
+                                message.guild,
+                                config,
+                                "🔗 ANTI-LINK",
+
+                                `**${message.author.tag}** izinsiz link gönderdi.\n\n` +
+
+                                `🗑️ Mesaj silindi: **${
+                                    punishment.deleted
+                                        ? "Evet"
+                                        : "Hayır"
+                                }**\n` +
+
+                                `🔨 Timeout: **${
+                                    punishment.timeout
+                                        ? "10 dakika"
+                                        : "Uygulanamadı"
+                                }**`,
+
+                                member
+                            );
+
+                            return;
+                        }
+                    }
+
+                    // =============================================
+                    // ANTI REKLAM
+                    // =============================================
+
+                    if (
+                        config.antiAd.enabled &&
                         containsAdvertisement(
                             message.content
                         )
                     ) {
 
-                        await punishMessage(
-                            message,
-                            "Reklam",
-                            10
-                        );
+                        if (
+                            !canPunish(
+                                guildId,
+                                userId,
+                                "advertisement"
+                            )
+                        ) {
+                            return;
+                        }
+
+                        const punishment =
+                            await punishMessage(
+                                message,
+                                "Reklam",
+                                10
+                            );
 
                         await securityLog(
                             message.guild,
                             config,
-                            "📢 REKLAM ENGELLENDİ",
+                            "📢 ANTI-REKLAM",
 
-                            `**${message.author.tag}** tarafından reklam içerikli mesaj engellendi.`,
+                            `**${message.author.tag}** tarafından reklam içerikli mesaj engellendi.\n\n` +
+
+                            `🗑️ Mesaj silindi: **${
+                                punishment.deleted
+                                    ? "Evet"
+                                    : "Hayır"
+                            }**\n` +
+
+                            `🔨 Timeout: **${
+                                punishment.timeout
+                                    ? "10 dakika"
+                                    : "Uygulanamadı"
+                            }**`,
 
                             member
                         );
 
                         return;
                     }
-                }
 
-                // =================================================
-                // MENTION
-                // =================================================
-
-                if (
-                    config.antiMention.enabled
-                ) {
+                    // =============================================
+                    // ANTI MENTION
+                    // =============================================
 
                     if (
+                        config.antiMention.enabled &&
                         containsMassMention(
                             message,
                             config
                         )
                     ) {
 
-                        await punishMessage(
-                            message,
-                            "Mention spam",
-                            config.antiMention.timeout
-                        );
+                        if (
+                            !canPunish(
+                                guildId,
+                                userId,
+                                "mention"
+                            )
+                        ) {
+                            return;
+                        }
+
+                        const punishment =
+                            await punishMessage(
+                                message,
+                                "Aşırı mention",
+                                config.antiMention.timeout
+                            );
 
                         await securityLog(
                             message.guild,
                             config,
-                            "👥 MENTION SPAM",
+                            "👥 ANTI-MENTION",
 
-                            `**${message.author.tag}** aşırı mention kullandı.`,
+                            `**${message.author.tag}** aşırı mention kullandı.\n\n` +
+
+                            `👤 Kullanıcı mention: **${message.mentions.users.size}**\n` +
+
+                            `🎭 Rol mention: **${message.mentions.roles.size}**\n` +
+
+                            `📢 Everyone: **${
+                                message.mentions.everyone
+                                    ? "Evet"
+                                    : "Hayır"
+                            }**\n` +
+
+                            `🔨 Timeout: **${
+                                punishment.timeout
+                                    ? `${config.antiMention.timeout} dakika`
+                                    : "Uygulanamadı"
+                            }**`,
 
                             member
                         );
 
                         return;
                     }
+
+                } catch (error) {
+
+                    console.error(
+                        "❌ Security message sistemi:",
+                        error
+                    );
                 }
             }
         );
 
-        // =====================================================
-        // RAID
-        // =====================================================
+        // =================================================
+        // MEMBER ADD
+        // =================================================
 
         client.on(
             "guildMemberAdd",
             async member => {
 
-                const config =
-                    getConfig(
-                        member.guild.id
-                    );
+                try {
 
-                if (!config.enabled) {
-                    return;
-                }
-
-                // -----------------------------
-                // BOT KORUMASI
-                // -----------------------------
-
-                if (
-                    member.user.bot &&
-                    config.antiBot.enabled
-                ) {
-
-                    const botMember =
-                        member.guild.members.me;
+                    const config =
+                        getConfig(
+                            member.guild.id
+                        );
 
                     if (
-                        botMember &&
-                        botMember.permissions.has(
-                            PermissionsBitField.Flags.KickMembers
-                        ) &&
-                        member.kickable
+                        !config.enabled
+                    ) {
+                        return;
+                    }
+
+                    // =============================================
+                    // BOT KORUMASI
+                    // =============================================
+
+                    if (
+                        member.user.bot &&
+                        config.antiBot.enabled
                     ) {
 
-                        try {
+                        if (
+                            isWhitelisted(
+                                member,
+                                config
+                            )
+                        ) {
+                            return;
+                        }
 
-                            await member.kick(
-                                "Mion Security: İzinsiz bot"
+                        if (
+                            member.kickable
+                        ) {
+
+                            try {
+
+                                await member.kick(
+                                    "Mion Security: İzinsiz bot"
+                                );
+
+                                await securityLog(
+                                    member.guild,
+                                    config,
+                                    "🤖 ANTI-BOT",
+
+                                    `**${member.user.tag}** sunucuya eklendi ancak bot koruması tarafından çıkarıldı.`,
+
+                                    member
+                                );
+
+                            } catch (error) {
+
+                                console.error(
+                                    "❌ Bot kicklenemedi:",
+                                    error.message
+                                );
+                            }
+                        }
+
+                        return;
+                    }
+
+                    // =============================================
+                    // RAID
+                    // =============================================
+
+                    if (
+                        config.antiRaid.enabled
+                    ) {
+
+                        const now =
+                            Date.now();
+
+                        let joins =
+                            raidTracker.get(
+                                member.guild.id
+                            ) || [];
+
+                        joins =
+                            joins.filter(
+                                timestamp =>
+                                    now - timestamp <=
+                                    config.antiRaid.interval
                             );
+
+                        joins.push(
+                            now
+                        );
+
+                        raidTracker.set(
+                            member.guild.id,
+                            joins
+                        );
+
+                        if (
+                            joins.length >=
+                            config.antiRaid.joinLimit
+                        ) {
 
                             await securityLog(
                                 member.guild,
                                 config,
-                                "🤖 BOT ENGELLENDİ",
+                                "🚨 ANTI-RAID",
 
-                                `**${member.user.tag}** sunucuya eklendi ve bot koruması tarafından çıkarıldı.`,
+                                `Kısa sürede çok fazla kullanıcı sunucuya katıldı.\n\n` +
+
+                                `👥 Katılım: **${joins.length}**\n` +
+
+                                `⏱️ Süre: **${config.antiRaid.interval / 1000} saniye**\n` +
+
+                                `⚔️ Aksiyon: **${config.antiRaid.action}**`,
 
                                 member
                             );
 
-                        } catch {}
+                            if (
+                                config.antiRaid.action === "kick" &&
+                                member.kickable &&
+                                !isWhitelisted(
+                                    member,
+                                    config
+                                )
+                            ) {
+
+                                try {
+
+                                    await member.kick(
+                                        "Mion Anti-Raid"
+                                    );
+
+                                } catch {}
+                            }
+
+                            raidTracker.set(
+                                member.guild.id,
+                                []
+                            );
+                        }
                     }
 
-                    return;
-                }
+                    // =============================================
+                    // YENİ HESAP
+                    // =============================================
 
-                if (
-                    !config.antiRaid.enabled
-                ) {
-                    return;
-                }
-
-                // -----------------------------
-                // RAID TRACKER
-                // -----------------------------
-
-                const now =
-                    Date.now();
-
-                let joins =
-                    raidTracker.get(
-                        member.guild.id
-                    ) || [];
-
-                joins =
-                    joins.filter(
-                        time =>
-                            now - time <=
-                            config.antiRaid.interval
-                    );
-
-                joins.push(now);
-
-                raidTracker.set(
-                    member.guild.id,
-                    joins
-                );
-
-                if (
-                    joins.length >=
-                    config.antiRaid.joinLimit
-                ) {
-
-                    await securityLog(
-                        member.guild,
-                        config,
-                        "🚨 RAID ALGILANDI",
-
-                        `Son **${config.antiRaid.interval / 1000} saniye** içerisinde **${joins.length}** kişi sunucuya katıldı.\n\n` +
-                        `🛡️ Raid koruması aktif.`,
-
-                        member
-                    );
-
-                    // Raid'i başlatan son katılan kişiye
-                    // ayardaki action uygulanır.
                     if (
-                        config.antiRaid.action === "kick" &&
-                        member.kickable
+                        config.antiRaid.enabled
                     ) {
 
-                        try {
-                            await member.kick(
-                                "Mion Anti-Raid"
+                        const accountAge =
+                            Date.now() -
+                            member.user.createdTimestamp;
+
+                        if (
+                            accountAge <
+                            config.antiRaid.accountAge
+                        ) {
+
+                            const ageHours =
+                                Math.max(
+                                    0,
+                                    Math.floor(
+                                        accountAge /
+                                        3600000
+                                    )
+                                );
+
+                            await securityLog(
+                                member.guild,
+                                config,
+                                "⚠️ YENİ HESAP",
+
+                                `**${member.user.tag}** yeni oluşturulmuş bir hesapla sunucuya katıldı.\n\n` +
+
+                                `👤 Hesap yaşı: **${ageHours} saat**\n` +
+
+                                `📅 Hesap: <t:${Math.floor(member.user.createdTimestamp / 1000)}:F>`,
+
+                                member
                             );
-                        } catch {}
+                        }
                     }
 
-                    raidTracker.set(
-                        member.guild.id,
-                        []
-                    );
-                }
+                } catch (error) {
 
-                // -----------------------------
-                // YENİ HESAP
-                // -----------------------------
-
-                const accountAge =
-                    Date.now() -
-                    member.user.createdTimestamp;
-
-                if (
-                    accountAge <
-                    config.antiRaid.accountAge
-                ) {
-
-                    await securityLog(
-                        member.guild,
-                        config,
-                        "⚠️ YENİ HESAP",
-
-                        `**${member.user.tag}** çok yeni bir hesapla sunucuya katıldı.\n\n` +
-                        `👤 Hesap yaşı: **${Math.floor(accountAge / 3600000)} saat**`,
-
-                        member
+                    console.error(
+                        "❌ Security memberAdd:",
+                        error
                     );
                 }
             }
         );
 
-        // =====================================================
-        // ANTI NUKE - CHANNEL DELETE
-        // =====================================================
+        // =================================================
+        // CHANNEL DELETE
+        // =================================================
 
         client.on(
             "channelDelete",
             async channel => {
 
-                if (!channel.guild) return;
-
-                const config =
-                    getConfig(
-                        channel.guild.id
-                    );
-
-                if (
-                    !config.enabled ||
-                    !config.antiNuke.enabled
-                ) {
-                    return;
-                }
-
                 try {
 
-                    const logs =
-                        await channel.guild.fetchAuditLogs({
-                            type: AuditLogEvent.ChannelDelete,
-                            limit: 1
-                        });
+                    if (!channel.guild) {
+                        return;
+                    }
 
-                    const entry =
-                        logs.entries.first();
-
-                    if (!entry) return;
+                    const config =
+                        getConfig(
+                            channel.guild.id
+                        );
 
                     if (
-                        Date.now() -
-                        entry.createdTimestamp >
-                        5000
+                        !config.enabled ||
+                        !config.antiNuke.enabled
                     ) {
+                        return;
+                    }
+
+                    const entry =
+                        await getAuditExecutor(
+                            channel.guild,
+                            AuditLogEvent.ChannelDelete,
+                            channel.id
+                        );
+
+                    if (!entry) {
                         return;
                     }
 
@@ -965,53 +1575,47 @@ module.exports = {
                 } catch (error) {
 
                     console.error(
-                        "Anti-Nuke channelDelete:",
+                        "❌ Anti-Nuke channelDelete:",
                         error
                     );
                 }
             }
         );
 
-        // =====================================================
-        // ANTI NUKE - CHANNEL CREATE
-        // =====================================================
+        // =================================================
+        // CHANNEL CREATE
+        // =================================================
 
         client.on(
             "channelCreate",
             async channel => {
 
-                if (!channel.guild) return;
-
-                const config =
-                    getConfig(
-                        channel.guild.id
-                    );
-
-                if (
-                    !config.enabled ||
-                    !config.antiNuke.enabled
-                ) {
-                    return;
-                }
-
                 try {
 
-                    const logs =
-                        await channel.guild.fetchAuditLogs({
-                            type: AuditLogEvent.ChannelCreate,
-                            limit: 1
-                        });
+                    if (!channel.guild) {
+                        return;
+                    }
 
-                    const entry =
-                        logs.entries.first();
-
-                    if (!entry) return;
+                    const config =
+                        getConfig(
+                            channel.guild.id
+                        );
 
                     if (
-                        Date.now() -
-                        entry.createdTimestamp >
-                        5000
+                        !config.enabled ||
+                        !config.antiNuke.enabled
                     ) {
+                        return;
+                    }
+
+                    const entry =
+                        await getAuditExecutor(
+                            channel.guild,
+                            AuditLogEvent.ChannelCreate,
+                            channel.id
+                        );
+
+                    if (!entry) {
                         return;
                     }
 
@@ -1023,48 +1627,46 @@ module.exports = {
                         config.antiNuke.channelCreate
                     );
 
-                } catch {}
+                } catch (error) {
+
+                    console.error(
+                        "❌ Anti-Nuke channelCreate:",
+                        error
+                    );
+                }
             }
         );
 
-        // =====================================================
-        // ANTI NUKE - ROLE DELETE
-        // =====================================================
+        // =================================================
+        // ROLE DELETE
+        // =================================================
 
         client.on(
             "roleDelete",
             async role => {
 
-                const config =
-                    getConfig(
-                        role.guild.id
-                    );
-
-                if (
-                    !config.enabled ||
-                    !config.antiNuke.enabled
-                ) {
-                    return;
-                }
-
                 try {
 
-                    const logs =
-                        await role.guild.fetchAuditLogs({
-                            type: AuditLogEvent.RoleDelete,
-                            limit: 1
-                        });
-
-                    const entry =
-                        logs.entries.first();
-
-                    if (!entry) return;
+                    const config =
+                        getConfig(
+                            role.guild.id
+                        );
 
                     if (
-                        Date.now() -
-                        entry.createdTimestamp >
-                        5000
+                        !config.enabled ||
+                        !config.antiNuke.enabled
                     ) {
+                        return;
+                    }
+
+                    const entry =
+                        await getAuditExecutor(
+                            role.guild,
+                            AuditLogEvent.RoleDelete,
+                            role.id
+                        );
+
+                    if (!entry) {
                         return;
                     }
 
@@ -1076,48 +1678,46 @@ module.exports = {
                         config.antiNuke.roleDelete
                     );
 
-                } catch {}
+                } catch (error) {
+
+                    console.error(
+                        "❌ Anti-Nuke roleDelete:",
+                        error
+                    );
+                }
             }
         );
 
-        // =====================================================
-        // ANTI NUKE - ROLE CREATE
-        // =====================================================
+        // =================================================
+        // ROLE CREATE
+        // =================================================
 
         client.on(
             "roleCreate",
             async role => {
 
-                const config =
-                    getConfig(
-                        role.guild.id
-                    );
-
-                if (
-                    !config.enabled ||
-                    !config.antiNuke.enabled
-                ) {
-                    return;
-                }
-
                 try {
 
-                    const logs =
-                        await role.guild.fetchAuditLogs({
-                            type: AuditLogEvent.RoleCreate,
-                            limit: 1
-                        });
-
-                    const entry =
-                        logs.entries.first();
-
-                    if (!entry) return;
+                    const config =
+                        getConfig(
+                            role.guild.id
+                        );
 
                     if (
-                        Date.now() -
-                        entry.createdTimestamp >
-                        5000
+                        !config.enabled ||
+                        !config.antiNuke.enabled
                     ) {
+                        return;
+                    }
+
+                    const entry =
+                        await getAuditExecutor(
+                            role.guild,
+                            AuditLogEvent.RoleCreate,
+                            role.id
+                        );
+
+                    if (!entry) {
                         return;
                     }
 
@@ -1129,48 +1729,46 @@ module.exports = {
                         config.antiNuke.roleCreate
                     );
 
-                } catch {}
+                } catch (error) {
+
+                    console.error(
+                        "❌ Anti-Nuke roleCreate:",
+                        error
+                    );
+                }
             }
         );
 
-        // =====================================================
+        // =================================================
         // BAN
-        // =====================================================
+        // =================================================
 
         client.on(
             "guildBanAdd",
             async ban => {
 
-                const config =
-                    getConfig(
-                        ban.guild.id
-                    );
-
-                if (
-                    !config.enabled ||
-                    !config.antiNuke.enabled
-                ) {
-                    return;
-                }
-
                 try {
 
-                    const logs =
-                        await ban.guild.fetchAuditLogs({
-                            type: AuditLogEvent.MemberBanAdd,
-                            limit: 1
-                        });
-
-                    const entry =
-                        logs.entries.first();
-
-                    if (!entry) return;
+                    const config =
+                        getConfig(
+                            ban.guild.id
+                        );
 
                     if (
-                        Date.now() -
-                        entry.createdTimestamp >
-                        5000
+                        !config.enabled ||
+                        !config.antiNuke.enabled
                     ) {
+                        return;
+                    }
+
+                    const entry =
+                        await getAuditExecutor(
+                            ban.guild,
+                            AuditLogEvent.MemberBanAdd,
+                            ban.user.id
+                        );
+
+                    if (!entry) {
                         return;
                     }
 
@@ -1182,48 +1780,46 @@ module.exports = {
                         config.antiNuke.ban
                     );
 
-                } catch {}
+                } catch (error) {
+
+                    console.error(
+                        "❌ Anti-Nuke ban:",
+                        error
+                    );
+                }
             }
         );
 
-        // =====================================================
+        // =================================================
         // KICK
-        // =====================================================
+        // =================================================
 
         client.on(
             "guildMemberRemove",
             async member => {
 
-                const config =
-                    getConfig(
-                        member.guild.id
-                    );
-
-                if (
-                    !config.enabled ||
-                    !config.antiNuke.enabled
-                ) {
-                    return;
-                }
-
                 try {
 
-                    const logs =
-                        await member.guild.fetchAuditLogs({
-                            type: AuditLogEvent.MemberKick,
-                            limit: 1
-                        });
-
-                    const entry =
-                        logs.entries.first();
-
-                    if (!entry) return;
+                    const config =
+                        getConfig(
+                            member.guild.id
+                        );
 
                     if (
-                        Date.now() -
-                        entry.createdTimestamp >
-                        5000
+                        !config.enabled ||
+                        !config.antiNuke.enabled
                     ) {
+                        return;
+                    }
+
+                    const entry =
+                        await getAuditExecutor(
+                            member.guild,
+                            AuditLogEvent.MemberKick,
+                            member.id
+                        );
+
+                    if (!entry) {
                         return;
                     }
 
@@ -1235,12 +1831,18 @@ module.exports = {
                         config.antiNuke.kick
                     );
 
-                } catch {}
+                } catch (error) {
+
+                    console.error(
+                        "❌ Anti-Nuke kick:",
+                        error
+                    );
+                }
             }
         );
 
         console.log(
-            "🛡️ Mion Security sistemi aktif."
+            "🛡️ Mion Security Event sistemi aktif."
         );
     }
 };

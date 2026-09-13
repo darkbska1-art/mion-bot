@@ -1,39 +1,30 @@
+
 const {
     SlashCommandBuilder,
     PermissionFlagsBits,
-    EmbedBuilder
+    EmbedBuilder,
+    ChannelType
 } = require("discord.js");
 
 const fs = require("fs");
 const path = require("path");
 
-const dataDir = path.join(__dirname, "../data");
+// =====================================================
+// DOSYA SİSTEMİ
+// =====================================================
+
+const dataDir = path.join(__dirname, "..", "data");
 const dataFile = path.join(dataDir, "security.json");
 
-
-// =====================================================
-// DATA
-// =====================================================
-
-function ensureData() {
-
-    if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, {
-            recursive: true
-        });
-    }
-
-    if (!fs.existsSync(dataFile)) {
-        fs.writeFileSync(
-            dataFile,
-            "{}",
-            "utf8"
-        );
-    }
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
 }
 
-function defaultConfig() {
+// =====================================================
+// VARSAYILAN AYARLAR
+// =====================================================
 
+function createDefaultConfig() {
     return {
         enabled: false,
 
@@ -101,44 +92,183 @@ function defaultConfig() {
     };
 }
 
-function loadData() {
+// =====================================================
+// AYARLARI BİRLEŞTİR
+// =====================================================
 
-    ensureData();
+function mergeConfig(oldConfig = {}) {
+
+    const defaults = createDefaultConfig();
+
+    return {
+        ...defaults,
+        ...oldConfig,
+
+        antiSpam: {
+            ...defaults.antiSpam,
+            ...(oldConfig.antiSpam || {})
+        },
+
+        antiFlood: {
+            ...defaults.antiFlood,
+            ...(oldConfig.antiFlood || {})
+        },
+
+        antiLink: {
+            ...defaults.antiLink,
+            ...(oldConfig.antiLink || {})
+        },
+
+        antiAd: {
+            ...defaults.antiAd,
+            ...(oldConfig.antiAd || {})
+        },
+
+        antiMention: {
+            ...defaults.antiMention,
+            ...(oldConfig.antiMention || {})
+        },
+
+        antiRaid: {
+            ...defaults.antiRaid,
+            ...(oldConfig.antiRaid || {})
+        },
+
+        antiBot: {
+            ...defaults.antiBot,
+            ...(oldConfig.antiBot || {})
+        },
+
+        antiNuke: {
+            ...defaults.antiNuke,
+            ...(oldConfig.antiNuke || {})
+        },
+
+        whitelist: {
+            ...defaults.whitelist,
+            ...(oldConfig.whitelist || {})
+        }
+    };
+}
+
+// =====================================================
+// OKU
+// =====================================================
+
+function loadData() {
 
     try {
 
-        return JSON.parse(
-            fs.readFileSync(
+        if (!fs.existsSync(dataFile)) {
+            const config = createDefaultConfig();
+
+            fs.writeFileSync(
                 dataFile,
+                JSON.stringify(config, null, 4),
                 "utf8"
-            )
+            );
+
+            return config;
+        }
+
+        const raw = fs.readFileSync(
+            dataFile,
+            "utf8"
         );
 
-    } catch {
+        if (!raw.trim()) {
+            return createDefaultConfig();
+        }
 
-        return {};
+        return mergeConfig(JSON.parse(raw));
 
+    } catch (error) {
+
+        console.error(
+            "❌ Security ayarları okunamadı:",
+            error
+        );
+
+        return createDefaultConfig();
     }
 }
 
+// =====================================================
+// KAYDET
+// =====================================================
+
 function saveData(data) {
 
-    ensureData();
+    try {
 
-    fs.writeFileSync(
-        dataFile,
-        JSON.stringify(
-            data,
-            null,
-            4
-        ),
-        "utf8"
-    );
+        fs.writeFileSync(
+            dataFile,
+            JSON.stringify(data, null, 4),
+            "utf8"
+        );
+
+        return true;
+
+    } catch (error) {
+
+        console.error(
+            "❌ Security ayarları kaydedilemedi:",
+            error
+        );
+
+        return false;
+    }
 }
 
+// =====================================================
+// SUNUCU AYARLARINI AL
+// =====================================================
+
+function getGuildConfig(guildId) {
+
+    const allData = loadData();
+
+    if (!allData[guildId]) {
+        allData[guildId] = createDefaultConfig();
+        saveData(allData);
+    }
+
+    allData[guildId] =
+        mergeConfig(allData[guildId]);
+
+    saveData(allData);
+
+    return {
+        allData,
+        config: allData[guildId]
+    };
+}
 
 // =====================================================
-// COMMAND
+// DURUM
+// =====================================================
+
+function status(enabled) {
+    return enabled ? "🟢 Açık" : "🔴 Kapalı";
+}
+
+// =====================================================
+// SİSTEM İSİMLERİ
+// =====================================================
+
+const systemNames = {
+    antiSpam: "Anti-Spam",
+    antiFlood: "Anti-Flood",
+    antiLink: "Anti-Link",
+    antiAd: "Anti-Reklam",
+    antiMention: "Anti-Mention",
+    antiRaid: "Anti-Raid",
+    antiBot: "Anti-Bot",
+    antiNuke: "Anti-Nuke"
+};
+
+// =====================================================
+// KOMUT
 // =====================================================
 
 module.exports = {
@@ -148,30 +278,231 @@ module.exports = {
         .setName("security")
 
         .setDescription(
-            "Mion Security sistemini yönetir."
+            "Sunucunun güvenlik sistemini yönetir."
         )
+
+        // =============================================
+        // AÇ
+        // =============================================
 
         .addSubcommand(sub =>
             sub
                 .setName("ac")
                 .setDescription(
-                    "Security sistemini açar."
+                    "Tüm güvenlik sistemini açar."
                 )
         )
+
+        // =============================================
+        // KAPAT
+        // =============================================
 
         .addSubcommand(sub =>
             sub
                 .setName("kapat")
                 .setDescription(
-                    "Security sistemini kapatır."
+                    "Tüm güvenlik sistemini kapatır."
                 )
         )
+
+        // =============================================
+        // DURUM
+        // =============================================
 
         .addSubcommand(sub =>
             sub
                 .setName("durum")
                 .setDescription(
-                    "Security sisteminin durumunu gösterir."
+                    "Güvenlik sistemlerinin durumunu gösterir."
+                )
+        )
+
+        // =============================================
+        // SİSTEM AYARLA
+        // =============================================
+
+        .addSubcommand(sub =>
+            sub
+                .setName("ayarla")
+                .setDescription(
+                    "Belirli bir güvenlik sistemini açar veya kapatır."
+                )
+
+                .addStringOption(option =>
+                    option
+                        .setName("sistem")
+                        .setDescription(
+                            "Ayarlanacak güvenlik sistemi."
+                        )
+                        .setRequired(true)
+                        .addChoices(
+                            {
+                                name: "Anti-Spam",
+                                value: "antiSpam"
+                            },
+                            {
+                                name: "Anti-Flood",
+                                value: "antiFlood"
+                            },
+                            {
+                                name: "Anti-Link",
+                                value: "antiLink"
+                            },
+                            {
+                                name: "Anti-Reklam",
+                                value: "antiAd"
+                            },
+                            {
+                                name: "Anti-Mention",
+                                value: "antiMention"
+                            },
+                            {
+                                name: "Anti-Raid",
+                                value: "antiRaid"
+                            },
+                            {
+                                name: "Anti-Bot",
+                                value: "antiBot"
+                            },
+                            {
+                                name: "Anti-Nuke",
+                                value: "antiNuke"
+                            }
+                        )
+                )
+
+                .addStringOption(option =>
+                    option
+                        .setName("durum")
+                        .setDescription(
+                            "Sistemin yeni durumu."
+                        )
+                        .setRequired(true)
+                        .addChoices(
+                            {
+                                name: "Aç",
+                                value: "ac"
+                            },
+                            {
+                                name: "Kapat",
+                                value: "kapat"
+                            }
+                        )
+                )
+        )
+
+        // =============================================
+        // LOG KANALI
+        // =============================================
+
+        .addSubcommand(sub =>
+            sub
+                .setName("log-kanal")
+                .setDescription(
+                    "Güvenlik log kanalını ayarlar."
+                )
+                .addChannelOption(option =>
+                    option
+                        .setName("kanal")
+                        .setDescription(
+                            "Güvenlik loglarının gönderileceği kanal."
+                        )
+                        .addChannelTypes(
+                            ChannelType.GuildText
+                        )
+                        .setRequired(true)
+                )
+        )
+
+        // =============================================
+        // LOG SIFIRLA
+        // =============================================
+
+        .addSubcommand(sub =>
+            sub
+                .setName("log-sifirla")
+                .setDescription(
+                    "Güvenlik log kanalını kaldırır."
+                )
+        )
+
+        // =============================================
+        // KULLANICI WHITELIST
+        // =============================================
+
+        .addSubcommand(sub =>
+            sub
+                .setName("whitelist-kullanici")
+                .setDescription(
+                    "Bir kullanıcıyı güvenlik whitelistine ekler."
+                )
+                .addUserOption(option =>
+                    option
+                        .setName("kullanici")
+                        .setDescription(
+                            "Whitelist'e eklenecek kullanıcı."
+                        )
+                        .setRequired(true)
+                )
+        )
+
+        // =============================================
+        // KULLANICI WHITELIST SİL
+        // =============================================
+
+        .addSubcommand(sub =>
+            sub
+                .setName("whitelist-kullanici-sil")
+                .setDescription(
+                    "Bir kullanıcıyı whitelistten çıkarır."
+                )
+                .addUserOption(option =>
+                    option
+                        .setName("kullanici")
+                        .setDescription(
+                            "Whitelistten çıkarılacak kullanıcı."
+                        )
+                        .setRequired(true)
+                )
+        )
+
+        // =============================================
+        // ROL WHITELIST
+        // =============================================
+
+        .addSubcommand(sub =>
+            sub
+                .setName("whitelist-rol")
+                .setDescription(
+                    "Bir rolü güvenlik whitelistine ekler."
+                )
+                .addRoleOption(option =>
+                    option
+                        .setName("rol")
+                        .setDescription(
+                            "Whitelist'e eklenecek rol."
+                        )
+                        .setRequired(true)
+                )
+        )
+
+        // =============================================
+        // ROL WHITELIST SİL
+        // =============================================
+
+        .addSubcommand(sub =>
+            sub
+                .setName("whitelist-rol-sil")
+                .setDescription(
+                    "Bir rolü whitelistten çıkarır."
+                )
+                .addRoleOption(option =>
+                    option
+                        .setName("rol")
+                        .setDescription(
+                            "Whitelistten çıkarılacak rol."
+                        )
+                        .setRequired(true)
                 )
         )
 
@@ -179,321 +510,471 @@ module.exports = {
             PermissionFlagsBits.ManageGuild
         ),
 
+    // =================================================
+    // EXECUTE
+    // =================================================
 
     async execute(interaction) {
 
-        const data = loadData();
-
-        const guildId =
-            interaction.guild.id;
-
-
-        // =================================================
-        // SUNUCU AYARINI OLUŞTUR
-        // =================================================
-
-        if (!data[guildId]) {
-
-            data[guildId] =
-                defaultConfig();
-
-            saveData(data);
-
+        if (!interaction.guild) {
+            return interaction.reply({
+                content:
+                    "❌ Bu komut sadece sunucularda kullanılabilir.",
+                ephemeral: true
+            });
         }
 
-
-        const config =
-            data[guildId];
-
-
-        // =================================================
-        // ESKİ CONFIG UYUMLULUĞU
-        // =================================================
+        // =============================================
+        // YETKİ
+        // =============================================
 
         if (
-            typeof config.enabled !== "boolean"
+            !interaction.member.permissions.has(
+                PermissionFlagsBits.ManageGuild
+            )
         ) {
-
-            config.enabled = false;
-
+            return interaction.reply({
+                content:
+                    "❌ Bu komutu kullanmak için **Sunucuyu Yönet** yetkisine sahip olmalısın.",
+                ephemeral: true
+            });
         }
 
+        // =============================================
+        // AYARLARI AL
+        // =============================================
+
+        const {
+            allData,
+            config
+        } = getGuildConfig(
+            interaction.guild.id
+        );
 
         const subcommand =
             interaction.options.getSubcommand();
 
-
-        // =================================================
-        // AÇ
-        // =================================================
+        // =============================================
+        // TÜM SİSTEMİ AÇ
+        // =============================================
 
         if (subcommand === "ac") {
 
-            if (config.enabled === true) {
-
-                return interaction.reply({
-
-                    embeds: [
-
-                        new EmbedBuilder()
-
-                            .setColor(0x000000)
-
-                            .setTitle(
-                                "🛡️ Mion Security Zaten Açık"
-                            )
-
-                            .setDescription(
-                                "Security sistemi bu sunucuda zaten aktif."
-                            )
-
-                            .setFooter({
-                                text:
-                                    "Mion • Security"
-                            })
-
-                            .setTimestamp()
-
-                    ],
-
-                    ephemeral: true
-
-                });
-
-            }
-
-
             config.enabled = true;
 
-            saveData(data);
+            allData[interaction.guild.id] =
+                config;
 
+            saveData(allData);
 
             return interaction.reply({
-
                 embeds: [
-
                     new EmbedBuilder()
-
                         .setColor(0x000000)
-
-                        .setTitle(
-                            "🟢 Mion Security Açıldı"
-                        )
-
+                        .setTitle("🛡️ Güvenlik Sistemi")
                         .setDescription(
-                            "Sunucu güvenlik sistemi başarıyla aktif edildi.\n\n" +
-                            "🛡️ Spam koruması\n" +
-                            "🌊 Flood koruması\n" +
-                            "🔗 Link koruması\n" +
-                            "📢 Reklam koruması\n" +
-                            "👥 Mention koruması\n" +
-                            "🚨 Raid koruması\n" +
-                            "🤖 Bot koruması\n" +
-                            "💥 Anti-Nuke sistemi"
+                            "Sunucunun güvenlik sistemi **aktif edildi**."
                         )
-
-                        .setFooter({
-                            text:
-                                "Mion • Security"
+                        .addFields({
+                            name: "Durum",
+                            value: "🟢 Aktif",
+                            inline: true
                         })
-
+                        .setFooter({
+                            text: "Mion • Security"
+                        })
                         .setTimestamp()
-
                 ]
-
             });
-
         }
 
-
-        // =================================================
-        // KAPAT
-        // =================================================
+        // =============================================
+        // TÜM SİSTEMİ KAPAT
+        // =============================================
 
         if (subcommand === "kapat") {
 
-            if (config.enabled !== true) {
-
-                return interaction.reply({
-
-                    embeds: [
-
-                        new EmbedBuilder()
-
-                            .setColor(0x000000)
-
-                            .setTitle(
-                                "🔴 Mion Security Zaten Kapalı"
-                            )
-
-                            .setDescription(
-                                "Security sistemi bu sunucuda zaten devre dışı."
-                            )
-
-                            .setFooter({
-                                text:
-                                    "Mion • Security"
-                            })
-
-                            .setTimestamp()
-
-                    ],
-
-                    ephemeral: true
-
-                });
-
-            }
-
-
             config.enabled = false;
 
-            saveData(data);
+            allData[interaction.guild.id] =
+                config;
 
+            saveData(allData);
 
             return interaction.reply({
-
                 embeds: [
-
                     new EmbedBuilder()
-
                         .setColor(0x000000)
-
-                        .setTitle(
-                            "🔴 Mion Security Kapatıldı"
-                        )
-
+                        .setTitle("🛡️ Güvenlik Sistemi")
                         .setDescription(
-                            "Sunucu güvenlik sistemi devre dışı bırakıldı.\n\n" +
-                            "⚠️ Koruma sistemleri artık çalışmayacak."
+                            "Sunucunun güvenlik sistemi **devre dışı bırakıldı**."
                         )
-
-                        .setFooter({
-                            text:
-                                "Mion • Security"
+                        .addFields({
+                            name: "Durum",
+                            value: "🔴 Kapalı",
+                            inline: true
                         })
-
+                        .setFooter({
+                            text: "Mion • Security"
+                        })
                         .setTimestamp()
-
                 ]
-
             });
-
         }
 
-
-        // =================================================
+        // =============================================
         // DURUM
-        // =================================================
+        // =============================================
 
         if (subcommand === "durum") {
 
-            const status =
-                config.enabled
-                    ? "🟢 AÇIK"
-                    : "🔴 KAPALI";
-
-
-            const spam =
-                config.antiSpam?.enabled
-                    ? "🟢 Açık"
-                    : "🔴 Kapalı";
-
-            const flood =
-                config.antiFlood?.enabled
-                    ? "🟢 Açık"
-                    : "🔴 Kapalı";
-
-            const link =
-                config.antiLink?.enabled
-                    ? "🟢 Açık"
-                    : "🔴 Kapalı";
-
-            const ad =
-                config.antiAd?.enabled
-                    ? "🟢 Açık"
-                    : "🔴 Kapalı";
-
-            const mention =
-                config.antiMention?.enabled
-                    ? "🟢 Açık"
-                    : "🔴 Kapalı";
-
-            const raid =
-                config.antiRaid?.enabled
-                    ? "🟢 Açık"
-                    : "🔴 Kapalı";
-
-            const bot =
-                config.antiBot?.enabled
-                    ? "🟢 Açık"
-                    : "🔴 Kapalı";
-
-            const nuke =
-                config.antiNuke?.enabled
-                    ? "🟢 Açık"
-                    : "🔴 Kapalı";
-
-
             const embed =
                 new EmbedBuilder()
-
                     .setColor(0x000000)
-
                     .setTitle(
-                        "🛡️ MION SECURITY DURUMU"
+                        "🛡️ Mion Güvenlik Merkezi"
                     )
-
                     .setDescription(
-                        `**Genel Sistem:** ${status}\n\n` +
-                        `🛡️ **Anti-Spam:** ${spam}\n` +
-                        `🌊 **Anti-Flood:** ${flood}\n` +
-                        `🔗 **Anti-Link:** ${link}\n` +
-                        `📢 **Anti-Reklam:** ${ad}\n` +
-                        `👥 **Anti-Mention:** ${mention}\n` +
-                        `🚨 **Anti-Raid:** ${raid}\n` +
-                        `🤖 **Anti-Bot:** ${bot}\n` +
-                        `💥 **Anti-Nuke:** ${nuke}`
+                        `**Genel Sistem:** ${status(config.enabled)}`
                     )
-
                     .addFields(
                         {
-                            name: "📊 Spam Limiti",
+                            name: "🛡️ Güvenlik Sistemleri",
                             value:
-                                `${config.antiSpam?.maxMessages || 6} mesaj / ` +
-                                `${(config.antiSpam?.interval || 5000) / 1000} saniye`,
+                                `**Anti-Spam:** ${status(config.antiSpam.enabled)}\n` +
+                                `**Anti-Flood:** ${status(config.antiFlood.enabled)}\n` +
+                                `**Anti-Link:** ${status(config.antiLink.enabled)}\n` +
+                                `**Anti-Reklam:** ${status(config.antiAd.enabled)}\n` +
+                                `**Anti-Mention:** ${status(config.antiMention.enabled)}\n` +
+                                `**Anti-Raid:** ${status(config.antiRaid.enabled)}\n` +
+                                `**Anti-Bot:** ${status(config.antiBot.enabled)}\n` +
+                                `**Anti-Nuke:** ${status(config.antiNuke.enabled)}`
+                        },
+
+                        {
+                            name: "⚙️ Anti-Spam",
+                            value:
+                                `Mesaj: **${config.antiSpam.maxMessages}**\n` +
+                                `Süre: **${config.antiSpam.interval / 1000}s**\n` +
+                                `Timeout: **${config.antiSpam.timeout} dk**`,
                             inline: true
                         },
+
                         {
-                            name: "🌊 Flood Limiti",
+                            name: "🌊 Anti-Flood",
                             value:
-                                `${config.antiFlood?.maxDuplicates || 3} tekrar / ` +
-                                `${(config.antiFlood?.interval || 8000) / 1000} saniye`,
+                                `Tekrar: **${config.antiFlood.maxDuplicates}**\n` +
+                                `Süre: **${config.antiFlood.interval / 1000}s**\n` +
+                                `Timeout: **${config.antiFlood.timeout} dk**`,
                             inline: true
                         },
+
                         {
-                            name: "🚨 Raid Limiti",
+                            name: "📢 Anti-Mention",
                             value:
-                                `${config.antiRaid?.joinLimit || 5} kişi / ` +
-                                `${(config.antiRaid?.interval || 10000) / 1000} saniye`,
+                                `Mention: **${config.antiMention.maxMentions}**\n` +
+                                `Everyone: **${config.antiMention.maxEveryone}**\n` +
+                                `Timeout: **${config.antiMention.timeout} dk**`,
+                            inline: true
+                        },
+
+                        {
+                            name: "🚨 Anti-Raid",
+                            value:
+                                `Katılım: **${config.antiRaid.joinLimit}**\n` +
+                                `Süre: **${config.antiRaid.interval / 1000}s**\n` +
+                                `Hesap yaşı: **${config.antiRaid.accountAge / 86400000} gün**\n` +
+                                `Aksiyon: **${config.antiRaid.action}**`,
+                            inline: true
+                        },
+
+                        {
+                            name: "💥 Anti-Nuke",
+                            value:
+                                `Kanal silme: **${config.antiNuke.channelDelete}**\n` +
+                                `Kanal oluşturma: **${config.antiNuke.channelCreate}**\n` +
+                                `Rol silme: **${config.antiNuke.roleDelete}**\n` +
+                                `Rol oluşturma: **${config.antiNuke.roleCreate}**\n` +
+                                `Ban: **${config.antiNuke.ban}**\n` +
+                                `Kick: **${config.antiNuke.kick}**`,
+                            inline: true
+                        },
+
+                        {
+                            name: "📋 Log Kanalı",
+                            value: config.logChannel
+                                ? `<#${config.logChannel}>`
+                                : "Ayarlanmadı",
+                            inline: true
+                        },
+
+                        {
+                            name: "👥 Whitelist",
+                            value:
+                                `Kullanıcı: **${config.whitelist.users.length}**\n` +
+                                `Rol: **${config.whitelist.roles.length}**`,
                             inline: true
                         }
                     )
-
                     .setFooter({
                         text:
-                            `${interaction.guild.name} • Mion Security`
+                            "Mion • Security System"
                     })
-
                     .setTimestamp();
-
 
             return interaction.reply({
                 embeds: [embed]
             });
-
         }
 
-    }
+        // =============================================
+        // SİSTEM AYARLA
+        // =============================================
 
+        if (subcommand === "ayarla") {
+
+            const system =
+                interaction.options.getString(
+                    "sistem"
+                );
+
+            const newStatus =
+                interaction.options.getString(
+                    "durum"
+                );
+
+            if (!config[system]) {
+
+                return interaction.reply({
+                    content:
+                        "❌ Geçersiz güvenlik sistemi.",
+                    ephemeral: true
+                });
+            }
+
+            config[system].enabled =
+                newStatus === "ac";
+
+            allData[interaction.guild.id] =
+                config;
+
+            saveData(allData);
+
+            return interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(0x000000)
+                        .setTitle("⚙️ Güvenlik Ayarı")
+                        .setDescription(
+                            `**${systemNames[system]}** sistemi ` +
+                            `${newStatus === "ac"
+                                ? "🟢 açıldı."
+                                : "🔴 kapatıldı."}`
+                        )
+                        .setFooter({
+                            text: "Mion • Security"
+                        })
+                        .setTimestamp()
+                ]
+            });
+        }
+
+        // =============================================
+        // LOG KANALI
+        // =============================================
+
+        if (subcommand === "log-kanal") {
+
+            const channel =
+                interaction.options.getChannel(
+                    "kanal"
+                );
+
+            config.logChannel =
+                channel.id;
+
+            allData[interaction.guild.id] =
+                config;
+
+            saveData(allData);
+
+            return interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(0x000000)
+                        .setTitle("📋 Güvenlik Logu")
+                        .setDescription(
+                            `Güvenlik log kanalı ${channel} olarak ayarlandı.`
+                        )
+                        .setFooter({
+                            text: "Mion • Security"
+                        })
+                        .setTimestamp()
+                ]
+            });
+        }
+
+        // =============================================
+        // LOG SIFIRLA
+        // =============================================
+
+        if (subcommand === "log-sifirla") {
+
+            config.logChannel = null;
+
+            allData[interaction.guild.id] =
+                config;
+
+            saveData(allData);
+
+            return interaction.reply({
+                content:
+                    "✅ Güvenlik log kanalı kaldırıldı."
+            });
+        }
+
+        // =============================================
+        // KULLANICI EKLE
+        // =============================================
+
+        if (
+            subcommand ===
+            "whitelist-kullanici"
+        ) {
+
+            const user =
+                interaction.options.getUser(
+                    "kullanici"
+                );
+
+            if (
+                config.whitelist.users.includes(
+                    user.id
+                )
+            ) {
+
+                return interaction.reply({
+                    content:
+                        "⚠️ Bu kullanıcı zaten whitelistte.",
+                    ephemeral: true
+                });
+            }
+
+            config.whitelist.users.push(
+                user.id
+            );
+
+            allData[interaction.guild.id] =
+                config;
+
+            saveData(allData);
+
+            return interaction.reply({
+                content:
+                    `✅ ${user} whitelist'e eklendi.`
+            });
+        }
+
+        // =============================================
+        // KULLANICI SİL
+        // =============================================
+
+        if (
+            subcommand ===
+            "whitelist-kullanici-sil"
+        ) {
+
+            const user =
+                interaction.options.getUser(
+                    "kullanici"
+                );
+
+            config.whitelist.users =
+                config.whitelist.users.filter(
+                    id => id !== user.id
+                );
+
+            allData[interaction.guild.id] =
+                config;
+
+            saveData(allData);
+
+            return interaction.reply({
+                content:
+                    `✅ ${user} whitelist'ten çıkarıldı.`
+            });
+        }
+
+        // =============================================
+        // ROL EKLE
+        // =============================================
+
+        if (
+            subcommand ===
+            "whitelist-rol"
+        ) {
+
+            const role =
+                interaction.options.getRole(
+                    "rol"
+                );
+
+            if (
+                config.whitelist.roles.includes(
+                    role.id
+                )
+            ) {
+
+                return interaction.reply({
+                    content:
+                        "⚠️ Bu rol zaten whitelistte.",
+                    ephemeral: true
+                });
+            }
+
+            config.whitelist.roles.push(
+                role.id
+            );
+
+            allData[interaction.guild.id] =
+                config;
+
+            saveData(allData);
+
+            return interaction.reply({
+                content:
+                    `✅ ${role} whitelist'e eklendi.`
+            });
+        }
+
+        // =============================================
+        // ROL SİL
+        // =============================================
+
+        if (
+            subcommand ===
+            "whitelist-rol-sil"
+        ) {
+
+            const role =
+                interaction.options.getRole(
+                    "rol"
+                );
+
+            config.whitelist.roles =
+                config.whitelist.roles.filter(
+                    id => id !== role.id
+                );
+
+            allData[interaction.guild.id] =
+                config;
+
+            saveData(allData);
+
+            return interaction.reply({
+                content:
+                    `✅ ${role} whitelist'ten çıkarıldı.`
+            });
+        }
+    }
 };
