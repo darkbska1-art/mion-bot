@@ -22,21 +22,75 @@ const dataFile = path.join(
     "welcome.json"
 );
 
-const imagesFolder = path.join(
-    __dirname,
-    "..",
-    "images"
-);
+// =====================================================
+// MAKIMA GÖRSEL YOLLARI
+// =====================================================
 
-const welcomeBackground = path.join(
-    imagesFolder,
-    "makima-welcome.png"
-);
+const imageCandidates = [
 
-const goodbyeBackground = path.join(
-    imagesFolder,
-    "makima-goodbye.png"
-);
+    // Projenin ana klasörü
+    path.join(
+        process.cwd(),
+        "images"
+    ),
+
+    // Commands / Events klasöründen bir üst
+    path.join(
+        __dirname,
+        "..",
+        "images"
+    ),
+
+    // Dosyanın bulunduğu klasörün içindeki images
+    path.join(
+        __dirname,
+        "images"
+    )
+];
+
+// =====================================================
+// GÖRSEL BUL
+// =====================================================
+
+function findImage(fileName) {
+
+    for (const folder of imageCandidates) {
+
+        const fullPath =
+            path.join(
+                folder,
+                fileName
+            );
+
+        if (
+            fs.existsSync(fullPath)
+        ) {
+
+            console.log(
+                `✓ Makima görseli bulundu: ${fullPath}`
+            );
+
+            return fullPath;
+        }
+    }
+
+    console.error(
+        `❌ Makima görseli bulunamadı: ${fileName}`
+    );
+
+    console.error(
+        "Aranan klasörler:"
+    );
+
+    for (const folder of imageCandidates) {
+
+        console.error(
+            `   → ${folder}`
+        );
+    }
+
+    return null;
+}
 
 // =====================================================
 // DATA
@@ -344,63 +398,107 @@ async function drawBackground(
     type
 ) {
 
-    if (!fs.existsSync(file)) {
+    // =================================================
+    // DOSYA KONTROLÜ
+    // =================================================
+
+    if (!file) {
 
         console.error(
-            `[Makima] Görsel bulunamadı: ${file}`
+            `[Makima] ${type} görseli bulunamadı!`
         );
 
-        const gradient =
-            ctx.createLinearGradient(
-                0,
-                0,
-                width,
-                height
-            );
-
-        gradient.addColorStop(
-            0,
-            "#180000"
-        );
-
-        gradient.addColorStop(
-            0.5,
-            "#8b0000"
-        );
-
-        gradient.addColorStop(
-            1,
-            "#050000"
-        );
-
-        ctx.fillStyle =
-            gradient;
-
-        ctx.fillRect(
-            0,
-            0,
+        drawFallback(
+            ctx,
             width,
-            height
+            height,
+            type
         );
 
         return false;
     }
 
+    // =================================================
+    // MAKIMA GÖRSELİNİ YÜKLE
+    // =================================================
+
     try {
+
+        console.log(
+            `🖼️ Makima yükleniyor: ${file}`
+        );
 
         const background =
             await loadImage(file);
 
-        drawCover(
-            ctx,
-            background,
-            0,
-            0,
-            width,
-            height
+        console.log(
+            `✓ Makima başarıyla yüklendi: ${background.width}x${background.height}`
         );
 
-        // Hafif karartma
+        // =================================================
+        // COVER
+        // =================================================
+
+        const imageRatio =
+            background.width /
+            background.height;
+
+        const canvasRatio =
+            width /
+            height;
+
+        let drawWidth;
+        let drawHeight;
+        let drawX;
+        let drawY;
+
+        if (
+            imageRatio > canvasRatio
+        ) {
+
+            drawHeight =
+                height;
+
+            drawWidth =
+                height *
+                imageRatio;
+
+            drawX =
+                (width - drawWidth) / 2;
+
+            drawY = 0;
+
+        } else {
+
+            drawWidth =
+                width;
+
+            drawHeight =
+                width /
+                imageRatio;
+
+            drawX = 0;
+
+            drawY =
+                (height - drawHeight) / 2;
+        }
+
+        // =================================================
+        // MAKIMA'YI ÇİZ
+        // =================================================
+
+        ctx.drawImage(
+            background,
+            drawX,
+            drawY,
+            drawWidth,
+            drawHeight
+        );
+
+        // =================================================
+        // HAFİF KARARTMA
+        // =================================================
+
         const overlay =
             ctx.createLinearGradient(
                 0,
@@ -442,10 +540,63 @@ async function drawBackground(
             `[Makima BG] ${error.stack || error.message}`
         );
 
+        drawFallback(
+            ctx,
+            width,
+            height,
+            type
+        );
+
         return false;
     }
 }
 
+// =====================================================
+// YEDEK ARKA PLAN
+// =====================================================
+
+function drawFallback(
+    ctx,
+    width,
+    height,
+    type
+) {
+
+    const gradient =
+        ctx.createLinearGradient(
+            0,
+            0,
+            width,
+            height
+        );
+
+    gradient.addColorStop(
+        0,
+        "#180000"
+    );
+
+    gradient.addColorStop(
+        0.5,
+        type === "welcome"
+            ? "#8b0000"
+            : "#550000"
+    );
+
+    gradient.addColorStop(
+        1,
+        "#050000"
+    );
+
+    ctx.fillStyle =
+        gradient;
+
+    ctx.fillRect(
+        0,
+        0,
+        width,
+        height
+    );
+}
 // =====================================================
 // ANA GÖRSEL
 // =====================================================
