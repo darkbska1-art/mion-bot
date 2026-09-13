@@ -1,0 +1,10 @@
+{
+    "1547576218046435389": {
+        "welcomeEnabled": true,
+        "welcomeChannel": "1548264630562983936",
+        "leaveEnabled": true,
+        "leaveChannel": "1548264647168106516",
+        "welcomeMessage": "👋 Hoş geldin {user}!\n\n**{server}** ailesine katıldın.\nSeninle birlikte **{membercount}** kişi olduk! ♡",
+        "leaveMessage": "🚪 **{username}** sunucudan ayrıldı.\n\n**{server}** artık **{membercount}** üyeye sahip."
+    }
+}

@@ -1,0 +1,20 @@
+{
+    "1537422445743448215": {
+        "enabled": true,
+        "levelChannel": "1547563734182924408",
+        "users": {
+            "1532502690255605944": {
+                "xp": 10,
+                "level": 1,
+                "totalXp": 110
+            }
+        },
+        "announce": true
+    },
+    "1547576218046435389": {
+        "enabled": false,
+        "levelChannel": null,
+        "announce": true,
+        "users": {}
+    }
+}

@@ -1,0 +1,53 @@
+{
+    "1537208318253076540": {
+        "enabled": true,
+        "categoryId": "1537762220484595822",
+        "supportRoleId": "1537536367167410246",
+        "logChannelId": "1537422367159095376",
+        "panelChannelId": "1537533763737878558",
+        "panelMessageId": "1547323789094944881",
+        "title": "sa",
+        "description": "deneme",
+        "color": "#FF69B4",
+        "buttonLabel": "xyvael",
+        "nextNumber": 3,
+        "tickets": {
+            "1547323825191129130": {
+                "channelId": "1547323825191129130",
+                "userId": "1532502690255605944",
+                "number": "001",
+                "openedAt": 1788981147971,
+                "open": false,
+                "addedStaff": [],
+                "closedAt": 1788981161780,
+                "closedBy": "1532502690255605944"
+            },
+            "1547324325680382042": {
+                "channelId": "1547324325680382042",
+                "userId": "1532502690255605944",
+                "number": "002",
+                "openedAt": 1788981267624,
+                "open": false,
+                "addedStaff": [],
+                "closedAt": 1788981281024,
+                "closedBy": "1532502690255605944"
+            }
+        }
+    },
+    "1537422445743448215": {
+        "enabled": true,
+        "categoryId": "1537422629848227930",
+        "supportRoleId": "1547515458108784680",
+        "logChannelId": "1547515392497295411",
+        "panelChannelId": "1547327080239210496",
+        "panelMessageId": "1547515609196011561",
+        "title": "ticket",
+        "description": "sa",
+        "color": "#FF69B4",
+        "buttonLabel": "sa",
+        "button2Label": "as",
+        "button3Label": "yetkili",
+        "nextNumber": 2,
+        "tickets": {}
+    }
+}

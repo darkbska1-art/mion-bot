@@ -1,0 +1,29 @@
+{
+    "1547576218046435389": {
+        "1532502690255605944": {
+            "para": 0,
+            "banka": 0,
+            "toplamKazanilan": 0,
+            "toplamHarcanan": 0,
+            "sonGunluk": 0,
+            "sonCalisma": 0,
+            "sonFaiz": 0,
+            "sonSoygun": 0,
+            "sonKasa": 0,
+            "meslek": "İşsiz",
+            "kasa": 0,
+            "envanter": {},
+            "gorevTarih": "2026-09-12",
+            "gorevler": {
+                "calisma": 0,
+                "transfer": 0,
+                "market": 0
+            },
+            "gorevOdulleri": {
+                "calisma": false,
+                "transfer": false,
+                "market": false
+            }
+        }
+    }
+}

@@ -1,0 +1,222 @@
+{
+    "1537422445743448215": {
+        "enabled": true,
+        "antiSpam": {
+            "enabled": true,
+            "maxMessages": 6,
+            "interval": 5000,
+            "timeout": 10
+        },
+        "antiFlood": {
+            "enabled": true,
+            "maxDuplicates": 3,
+            "interval": 8000,
+            "timeout": 10
+        },
+        "antiLink": {
+            "enabled": true,
+            "allowDiscord": false,
+            "whitelist": []
+        },
+        "antiAd": {
+            "enabled": true
+        },
+        "antiMention": {
+            "enabled": true,
+            "maxMentions": 5,
+            "maxEveryone": 1,
+            "timeout": 10
+        },
+        "antiRaid": {
+            "enabled": true,
+            "joinLimit": 5,
+            "interval": 10000,
+            "accountAge": 86400000,
+            "action": "kick"
+        },
+        "antiBot": {
+            "enabled": true
+        },
+        "antiNuke": {
+            "enabled": true,
+            "channelDelete": 3,
+            "channelCreate": 5,
+            "roleDelete": 3,
+            "roleCreate": 5,
+            "ban": 3,
+            "kick": 3,
+            "interval": 10000,
+            "action": "kick"
+        },
+        "logChannel": "1547327080239210496",
+        "whitelist": {
+            "users": [],
+            "roles": []
+        }
+    },
+    "1543564911517372548": {
+        "enabled": true,
+        "antiSpam": {
+            "enabled": true,
+            "maxMessages": 6,
+            "interval": 5000,
+            "timeout": 10
+        },
+        "antiFlood": {
+            "enabled": true,
+            "maxDuplicates": 3,
+            "interval": 8000,
+            "timeout": 10
+        },
+        "antiLink": {
+            "enabled": true,
+            "allowDiscord": false,
+            "whitelist": []
+        },
+        "antiAd": {
+            "enabled": true
+        },
+        "antiMention": {
+            "enabled": true,
+            "maxMentions": 5,
+            "maxEveryone": 1,
+            "timeout": 10
+        },
+        "antiRaid": {
+            "enabled": true,
+            "joinLimit": 5,
+            "interval": 10000,
+            "accountAge": 86400000,
+            "action": "kick"
+        },
+        "antiBot": {
+            "enabled": true
+        },
+        "antiNuke": {
+            "enabled": true,
+            "channelDelete": 3,
+            "channelCreate": 5,
+            "roleDelete": 3,
+            "roleCreate": 5,
+            "ban": 3,
+            "kick": 3,
+            "interval": 10000,
+            "action": "kick"
+        },
+        "logChannel": "1545020446439903322",
+        "whitelist": {
+            "users": [],
+            "roles": []
+        }
+    },
+    "1537208318253076540": {
+        "enabled": true,
+        "antiSpam": {
+            "enabled": true,
+            "maxMessages": 6,
+            "interval": 5000,
+            "timeout": 10
+        },
+        "antiFlood": {
+            "enabled": true,
+            "maxDuplicates": 3,
+            "interval": 8000,
+            "timeout": 10
+        },
+        "antiLink": {
+            "enabled": true,
+            "allowDiscord": false,
+            "whitelist": []
+        },
+        "antiAd": {
+            "enabled": true
+        },
+        "antiMention": {
+            "enabled": true,
+            "maxMentions": 5,
+            "maxEveryone": 1,
+            "timeout": 10
+        },
+        "antiRaid": {
+            "enabled": true,
+            "joinLimit": 5,
+            "interval": 10000,
+            "accountAge": 86400000,
+            "action": "kick"
+        },
+        "antiBot": {
+            "enabled": true
+        },
+        "antiNuke": {
+            "enabled": true,
+            "channelDelete": 3,
+            "channelCreate": 5,
+            "roleDelete": 3,
+            "roleCreate": 5,
+            "ban": 3,
+            "kick": 3,
+            "interval": 10000,
+            "action": "kick"
+        },
+        "logChannel": null,
+        "whitelist": {
+            "users": [],
+            "roles": []
+        }
+    },
+    "1547576218046435389": {
+        "enabled": false,
+        "antiSpam": {
+            "enabled": true,
+            "maxMessages": 6,
+            "interval": 5000,
+            "timeout": 10
+        },
+        "antiFlood": {
+            "enabled": true,
+            "maxDuplicates": 3,
+            "interval": 8000,
+            "timeout": 10
+        },
+        "antiLink": {
+            "enabled": true,
+            "allowDiscord": false,
+            "whitelist": []
+        },
+        "antiAd": {
+            "enabled": true
+        },
+        "antiMention": {
+            "enabled": true,
+            "maxMentions": 5,
+            "maxEveryone": 1,
+            "timeout": 10
+        },
+        "antiRaid": {
+            "enabled": true,
+            "joinLimit": 5,
+            "interval": 10000,
+            "accountAge": 86400000,
+            "action": "kick"
+        },
+        "antiBot": {
+            "enabled": true
+        },
+        "antiNuke": {
+            "enabled": true,
+            "channelDelete": 3,
+            "channelCreate": 5,
+            "roleDelete": 3,
+            "roleCreate": 5,
+            "ban": 3,
+            "kick": 3,
+            "interval": 10000,
+            "action": "kick"
+        },
+        "logChannel": null,
+        "whitelist": {
+            "users": [],
+            "roles": []
+        }
+    }
+}

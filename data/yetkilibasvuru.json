@@ -1,0 +1,46 @@
+{
+    "1547576218046435389": {
+        "enabled": true,
+        "panelChannelId": "1547576396979900598",
+        "applicationChannelId": "1547625513022132244",
+        "channelId": "1547576396979900598",
+        "staffRoleId": "1547625590155251823",
+        "applications": {
+            "1": {
+                "id": 1,
+                "userId": "1532502690255605944",
+                "username": "xyvael",
+                "createdAt": 1789053229518,
+                "status": "Kabul Edildi",
+                "reviewerId": "1532502690255605944",
+                "reason": null,
+                "answers": {
+                    "yas": "15",
+                    "neden": "deneeme",
+                    "deneyim": "mod",
+                    "katki": "etkinlik",
+                    "aktiflik": "4 saat"
+                },
+                "messageId": "1547626158911262724"
+            },
+            "1532502690255605944_1789199830900": {
+                "id": "1532502690255605944_1789199830900",
+                "userId": "1532502690255605944",
+                "username": "xyvael",
+                "createdAt": 1789199831529,
+                "status": "accepted",
+                "reviewerId": "1532502690255605944",
+                "reason": "Başvuru kabul edildi.",
+                "answers": {
+                    "age": "19",
+                    "reason": "keyif",
+                    "experience": "evet",
+                    "contribution": "moderasyon",
+                    "activity": "5 saat"
+                },
+                "messageId": "1548241049875652629",
+                "channelId": "1547625513022132244"
+            }
+        }
+    }
+}
