@@ -28,17 +28,11 @@ const imagesFolder = path.join(
     "images"
 );
 
-// =====================================================
-// MAKIMA GÖRSELLERİ
-// =====================================================
-
-// Oluşturduğumuz Makima görseli
 const welcomeBackground = path.join(
     imagesFolder,
     "makima-welcome.png"
 );
 
-// Görüşürüz görseli
 const goodbyeBackground = path.join(
     imagesFolder,
     "makima-goodbye.png"
@@ -100,7 +94,6 @@ function getAccountAge(timestamp) {
             );
 
         if (remainingMonths > 0) {
-
             return `${years} yıl ${remainingMonths} ay`;
         }
 
@@ -123,7 +116,7 @@ function getAccountAge(timestamp) {
 }
 
 // =====================================================
-// METİN SIĞDIRMA
+// TEXT FIT
 // =====================================================
 
 function fitText(
@@ -162,7 +155,7 @@ function fitText(
 }
 
 // =====================================================
-// YUVARLAK KÖŞELİ ALAN
+// ROUND RECT
 // =====================================================
 
 function roundRect(
@@ -233,7 +226,7 @@ function roundRect(
 }
 
 // =====================================================
-// DAİRESEL AVATAR
+// CIRCLE IMAGE
 // =====================================================
 
 function drawCircleImage(
@@ -272,7 +265,75 @@ function drawCircleImage(
 }
 
 // =====================================================
-// MAKIMA ARKA PLAN
+// COVER IMAGE
+// =====================================================
+
+function drawCover(
+    ctx,
+    image,
+    x,
+    y,
+    width,
+    height
+) {
+
+    const imageRatio =
+        image.width /
+        image.height;
+
+    const boxRatio =
+        width /
+        height;
+
+    let drawWidth;
+    let drawHeight;
+    let drawX;
+    let drawY;
+
+    if (
+        imageRatio > boxRatio
+    ) {
+
+        drawHeight =
+            height;
+
+        drawWidth =
+            height *
+            imageRatio;
+
+        drawX =
+            x +
+            (width - drawWidth) / 2;
+
+        drawY = y;
+
+    } else {
+
+        drawWidth =
+            width;
+
+        drawHeight =
+            width /
+            imageRatio;
+
+        drawX = x;
+
+        drawY =
+            y +
+            (height - drawHeight) / 2;
+    }
+
+    ctx.drawImage(
+        image,
+        drawX,
+        drawY,
+        drawWidth,
+        drawHeight
+    );
+}
+
+// =====================================================
+// ARKA PLAN
 // =====================================================
 
 async function drawBackground(
@@ -283,173 +344,19 @@ async function drawBackground(
     type
 ) {
 
-    // =================================================
-    // MAKIMA GÖRSELİ
-    // =================================================
+    if (!fs.existsSync(file)) {
 
-    if (
-        fs.existsSync(file)
-    ) {
-
-        try {
-
-            const background =
-                await loadImage(file);
-
-            // =============================================
-            // COVER SİSTEMİ
-            // Görsel bozulmaz / ezilmez
-            // =============================================
-
-            const imageRatio =
-                background.width /
-                background.height;
-
-            const canvasRatio =
-                width /
-                height;
-
-            let drawWidth;
-            let drawHeight;
-            let drawX;
-            let drawY;
-
-            if (
-                imageRatio >
-                canvasRatio
-            ) {
-
-                drawHeight =
-                    height;
-
-                drawWidth =
-                    height *
-                    imageRatio;
-
-                drawX =
-                    (width - drawWidth) / 2;
-
-                drawY = 0;
-
-            } else {
-
-                drawWidth =
-                    width;
-
-                drawHeight =
-                    width /
-                    imageRatio;
-
-                drawX = 0;
-
-                drawY =
-                    (height - drawHeight) / 2;
-            }
-
-            ctx.drawImage(
-                background,
-                drawX,
-                drawY,
-                drawWidth,
-                drawHeight
-            );
-
-            // =================================================
-            // MAKIMA ÜZERİNE SİNEMATİK KARARTMA
-            // =================================================
-
-            const overlay =
-                ctx.createLinearGradient(
-                    0,
-                    0,
-                    width,
-                    0
-                );
-
-            overlay.addColorStop(
-                0,
-                "rgba(0,0,0,0.05)"
-            );
-
-            overlay.addColorStop(
-                0.45,
-                "rgba(0,0,0,0.18)"
-            );
-
-            overlay.addColorStop(
-                1,
-                "rgba(0,0,0,0.48)"
-            );
-
-            ctx.fillStyle =
-                overlay;
-
-            ctx.fillRect(
-                0,
-                0,
-                width,
-                height
-            );
-
-            // =================================================
-            // KIRMIZI VIGNETTE
-            // =================================================
-
-            const vignette =
-                ctx.createRadialGradient(
-                    width / 2,
-                    height / 2,
-                    100,
-                    width / 2,
-                    height / 2,
-                    700
-                );
-
-            vignette.addColorStop(
-                0,
-                "rgba(255,0,0,0)"
-            );
-
-            vignette.addColorStop(
-                1,
-                "rgba(0,0,0,0.40)"
-            );
-
-            ctx.fillStyle =
-                vignette;
-
-            ctx.fillRect(
-                0,
-                0,
-                width,
-                height
-            );
-
-            return;
-
-        } catch (error) {
-
-            console.error(
-                `[Makima BG] ${error.message}`
-            );
-        }
-    }
-
-    // =================================================
-    // YEDEK ARKA PLAN
-    // =================================================
-
-    const gradient =
-        ctx.createLinearGradient(
-            0,
-            0,
-            width,
-            height
+        console.error(
+            `[Makima] Görsel bulunamadı: ${file}`
         );
 
-    if (
-        type === "welcome"
-    ) {
+        const gradient =
+            ctx.createLinearGradient(
+                0,
+                0,
+                width,
+                height
+            );
 
         gradient.addColorStop(
             0,
@@ -466,37 +373,81 @@ async function drawBackground(
             "#050000"
         );
 
-    } else {
+        ctx.fillStyle =
+            gradient;
 
-        gradient.addColorStop(
+        ctx.fillRect(
             0,
-            "#080000"
+            0,
+            width,
+            height
         );
 
-        gradient.addColorStop(
-            0.5,
-            "#550000"
-        );
-
-        gradient.addColorStop(
-            1,
-            "#020000"
-        );
+        return false;
     }
 
-    ctx.fillStyle =
-        gradient;
+    try {
 
-    ctx.fillRect(
-        0,
-        0,
-        width,
-        height
-    );
+        const background =
+            await loadImage(file);
+
+        drawCover(
+            ctx,
+            background,
+            0,
+            0,
+            width,
+            height
+        );
+
+        // Hafif karartma
+        const overlay =
+            ctx.createLinearGradient(
+                0,
+                0,
+                width,
+                0
+            );
+
+        overlay.addColorStop(
+            0,
+            "rgba(0,0,0,0.02)"
+        );
+
+        overlay.addColorStop(
+            0.45,
+            "rgba(0,0,0,0.05)"
+        );
+
+        overlay.addColorStop(
+            1,
+            "rgba(0,0,0,0.16)"
+        );
+
+        ctx.fillStyle =
+            overlay;
+
+        ctx.fillRect(
+            0,
+            0,
+            width,
+            height
+        );
+
+        return true;
+
+    } catch (error) {
+
+        console.error(
+            `[Makima BG] ${error.stack || error.message}`
+        );
+
+        return false;
+    }
 }
 
 // =====================================================
-// GÖRSEL OLUŞTUR
+// ANA GÖRSEL
 // =====================================================
 
 async function createImage(
@@ -517,7 +468,7 @@ async function createImage(
         canvas.getContext("2d");
 
     // =================================================
-    // MAKIMA ARKA PLAN
+    // MAKIMA
     // =================================================
 
     const background =
@@ -534,69 +485,109 @@ async function createImage(
     );
 
     // =================================================
-    // SAĞ BİLGİ PANELİ
+    // SAĞ DİNAMİK PANEL
     // =================================================
 
     roundRect(
         ctx,
-        575,
-        145,
-        560,
-        300,
+        655,
+        55,
+        485,
+        390,
         28
     );
 
     ctx.fillStyle =
-        "rgba(0,0,0,0.78)";
+        "rgba(0,0,0,0.76)";
 
     ctx.fill();
 
     ctx.strokeStyle =
-        "rgba(255,35,35,0.90)";
+        "rgba(255,40,55,0.95)";
 
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
 
     ctx.stroke();
 
-    // =================================================
-    // İÇ IŞIK
-    // =================================================
+    // İç çizgi
 
     roundRect(
         ctx,
-        583,
-        153,
-        544,
-        284,
+        666,
+        66,
+        463,
+        368,
         22
     );
 
     ctx.strokeStyle =
-        "rgba(255,80,80,0.18)";
+        "rgba(255,100,100,0.20)";
 
     ctx.lineWidth = 1;
 
     ctx.stroke();
 
     // =================================================
-    // ÜST BAŞLIK
+    // BAŞLIK
     // =================================================
 
     ctx.textAlign =
         "left";
 
     ctx.font =
-        "bold 17px Sans";
+        "bold 18px Sans";
 
     ctx.fillStyle =
-        "#ff5252";
+        "#ff5265";
 
     ctx.fillText(
         type === "welcome"
-            ? "❤️  HOŞ GELDİN"
-            : "🚪  GÖRÜŞÜRÜZ",
-        610,
-        180
+            ? "❤️  HOŞ GELDİN!"
+            : "🚪  GÖRÜŞÜRÜZ!",
+        695,
+        100
+    );
+
+    // =================================================
+    // KULLANICI ADI
+    // =================================================
+
+    const displayName =
+        member.user.globalName ||
+        member.user.username;
+
+    ctx.font =
+        "bold 40px Sans";
+
+    ctx.fillStyle =
+        "#ffffff";
+
+    ctx.fillText(
+        fitText(
+            ctx,
+            displayName,
+            410
+        ),
+        695,
+        150
+    );
+
+    // =================================================
+    // AÇIKLAMA
+    // =================================================
+
+    ctx.font =
+        "18px Sans";
+
+    ctx.fillStyle =
+        "#ffcccc";
+
+    ctx.fillText(
+        type === "welcome"
+            ? "Aramıza katıldığın için mutluyuz."
+            : "Sunucumuzdan ayrıldı. Görüşürüz!",
+        695,
+        181
     );
 
     // =================================================
@@ -623,26 +614,24 @@ async function createImage(
         );
     }
 
-    const avatarX = 485;
-    const avatarY = 300;
-    const avatarRadius = 86;
+    const avatarX = 610;
+    const avatarY = 250;
+    const avatarRadius = 78;
 
-    // =================================================
-    // AVATAR GLOW
-    // =================================================
+    // Avatar glow
 
     ctx.beginPath();
 
     ctx.arc(
         avatarX,
         avatarY,
-        avatarRadius + 16,
+        avatarRadius + 14,
         0,
         Math.PI * 2
     );
 
     ctx.fillStyle =
-        "rgba(220,0,0,0.30)";
+        "rgba(255,0,35,0.28)";
 
     ctx.fill();
 
@@ -651,21 +640,17 @@ async function createImage(
     ctx.arc(
         avatarX,
         avatarY,
-        avatarRadius + 9,
+        avatarRadius + 8,
         0,
         Math.PI * 2
     );
 
     ctx.strokeStyle =
-        "#ff3030";
+        "#ff3045";
 
     ctx.lineWidth = 4;
 
     ctx.stroke();
-
-    // =================================================
-    // AVATAR
-    // =================================================
 
     if (avatar) {
 
@@ -690,118 +675,88 @@ async function createImage(
         );
 
         ctx.fillStyle =
-            "#300000";
+            "#350000";
 
         ctx.fill();
     }
 
     // =================================================
-    // KULLANICI ADI
+    // BİLGİ KUTULARI
     // =================================================
 
-    const displayName =
-        member.user.globalName ||
-        member.user.username;
+    const memberCount =
+        member.guild.memberCount
+            .toLocaleString("tr-TR");
 
-    ctx.font =
-        "bold 34px Sans";
-
-    ctx.fillStyle =
-        "#ffffff";
-
-    ctx.fillText(
-        fitText(
-            ctx,
-            displayName,
-            440
-        ),
-        610,
-        225
-    );
-
-    // =================================================
-    // ALT MESAJ
-    // =================================================
-
-    ctx.font =
-        "19px Sans";
-
-    ctx.fillStyle =
-        "#ffb0b0";
-
-    ctx.fillText(
-        type === "welcome"
-            ? "Aramıza katıldığın için mutluyuz."
-            : "Sunucumuzdan ayrıldı. Görüşürüz!",
-        610,
-        257
-    );
-
-    // =================================================
-    // ÜYE SAYISI PANELİ
-    // =================================================
+    // Üye sayısı
 
     roundRect(
         ctx,
-        610,
-        285,
+        695,
         220,
-        62,
+        200,
+        70,
         14
     );
 
     ctx.fillStyle =
-        "rgba(170,0,0,0.32)";
+        "rgba(150,0,15,0.32)";
 
     ctx.fill();
 
     ctx.strokeStyle =
-        "rgba(255,60,60,0.45)";
+        "rgba(255,70,80,0.45)";
 
     ctx.lineWidth = 1;
 
     ctx.stroke();
 
     ctx.font =
-        "bold 21px Sans";
+        "bold 22px Sans";
 
     ctx.fillStyle =
         "#ffffff";
 
-    const memberCount =
-        member.guild.memberCount
-            .toLocaleString("tr-TR");
-
     ctx.fillText(
         type === "welcome"
             ? `#${memberCount} Üye`
-            : `${memberCount} Üye Kaldı`,
-        630,
-        323
+            : `${memberCount} Üye`,
+        715,
+        250
     );
 
-    // =================================================
-    // HESAP YAŞI PANELİ
-    // =================================================
+    ctx.font =
+        "14px Sans";
+
+    ctx.fillStyle =
+        "#ffaaaa";
+
+    ctx.fillText(
+        type === "welcome"
+            ? "Sunucudaki üye sayısı"
+            : "Sunucuda kalan üye",
+        715,
+        273
+    );
+
+    // Hesap yaşı
 
     roundRect(
         ctx,
-        850,
-        285,
-        245,
-        62,
+        915,
+        220,
+        200,
+        70,
         14
     );
 
     ctx.fillStyle =
-        "rgba(170,0,0,0.32)";
+        "rgba(150,0,15,0.32)";
 
     ctx.fill();
 
     ctx.strokeStyle =
-        "rgba(255,60,60,0.45)";
-
-    ctx.lineWidth = 1;
+        "rgba(255,70,80,0.45)";
 
     ctx.stroke();
 
@@ -815,8 +770,8 @@ async function createImage(
         getAccountAge(
             member.user.createdTimestamp
         ),
-        870,
-        316
+        935,
+        250
     );
 
     ctx.font =
@@ -827,12 +782,12 @@ async function createImage(
 
     ctx.fillText(
         "Hesap yaşı",
-        870,
-        338
+        935,
+        273
     );
 
     // =================================================
-    // SUNUCU ADI
+    // SUNUCU
     // =================================================
 
     ctx.font =
@@ -845,10 +800,26 @@ async function createImage(
         fitText(
             ctx,
             member.guild.name,
-            480
+            420
         ),
-        610,
-        390
+        695,
+        330
+    );
+
+    // =================================================
+    // USERNAME
+    // =================================================
+
+    ctx.font =
+        "15px Sans";
+
+    ctx.fillStyle =
+        "#ffaaaa";
+
+    ctx.fillText(
+        `@${member.user.username}`,
+        695,
+        357
     );
 
     // =================================================
@@ -856,17 +827,17 @@ async function createImage(
     // =================================================
 
     ctx.font =
-        "15px Sans";
+        "bold 15px Sans";
 
     ctx.fillStyle =
-        "#ff8c8c";
+        "#ff7f8c";
 
     ctx.fillText(
         type === "welcome"
             ? "Mion • Makima • Hoş geldin ❤️"
             : "Mion • Makima • Görüşürüz ❤️",
-        610,
-        418
+        695,
+        405
     );
 
     // =================================================
@@ -927,10 +898,6 @@ module.exports = {
 
                 try {
 
-                    // =================================================
-                    // MAKIMA GÖRSELİ
-                    // =================================================
-
                     const image =
                         await createImage(
                             member,
@@ -942,13 +909,9 @@ module.exports = {
                             image,
                             {
                                 name:
-                                    "makima-welcome-generated.png"
+                                    "makima-welcome.png"
                             }
                         );
-
-                    // =================================================
-                    // EMBED
-                    // =================================================
 
                     const embed =
                         new EmbedBuilder()
@@ -968,28 +931,25 @@ module.exports = {
                                 })
                             )
                             .setImage(
-                                "attachment://makima-welcome-generated.png"
+                                "attachment://makima-welcome.png"
                             )
                             .addFields(
                                 {
-                                    name:
-                                        "👤 Kullanıcı",
+                                    name: "👤 Kullanıcı",
                                     value:
                                         `${member}\n` +
                                         `\`${member.user.username}\``,
                                     inline: true
                                 },
                                 {
-                                    name:
-                                        "👥 Üye Sayısı",
+                                    name: "👥 Üye Sayısı",
                                     value:
                                         member.guild.memberCount
                                             .toLocaleString("tr-TR"),
                                     inline: true
                                 },
                                 {
-                                    name:
-                                        "📅 Hesap Yaşı",
+                                    name: "📅 Hesap Yaşı",
                                     value:
                                         getAccountAge(
                                             member.user.createdTimestamp
@@ -1003,13 +963,8 @@ module.exports = {
                             })
                             .setTimestamp();
 
-                    // =================================================
-                    // MESAJ
-                    // =================================================
-
                     await channel.send({
-                        content:
-                            `${member}`,
+                        content: `${member}`,
                         embeds: [
                             embed
                         ],
@@ -1072,10 +1027,6 @@ module.exports = {
 
                 try {
 
-                    // =================================================
-                    // MAKIMA GÖRÜŞÜRÜZ GÖRSELİ
-                    // =================================================
-
                     const image =
                         await createImage(
                             member,
@@ -1087,13 +1038,9 @@ module.exports = {
                             image,
                             {
                                 name:
-                                    "makima-goodbye-generated.png"
+                                    "makima-goodbye.png"
                             }
                         );
-
-                    // =================================================
-                    // EMBED
-                    // =================================================
 
                     const embed =
                         new EmbedBuilder()
@@ -1113,28 +1060,25 @@ module.exports = {
                                 })
                             )
                             .setImage(
-                                "attachment://makima-goodbye-generated.png"
+                                "attachment://makima-goodbye.png"
                             )
                             .addFields(
                                 {
-                                    name:
-                                        "👤 Kullanıcı",
+                                    name: "👤 Kullanıcı",
                                     value:
                                         `\`${member.user.username}\`\n` +
                                         `ID: \`${member.id}\``,
                                     inline: true
                                 },
                                 {
-                                    name:
-                                        "👥 Kalan Üye",
+                                    name: "👥 Kalan Üye",
                                     value:
                                         member.guild.memberCount
                                             .toLocaleString("tr-TR"),
                                     inline: true
                                 },
                                 {
-                                    name:
-                                        "📅 Hesap Yaşı",
+                                    name: "📅 Hesap Yaşı",
                                     value:
                                         getAccountAge(
                                             member.user.createdTimestamp
@@ -1147,10 +1091,6 @@ module.exports = {
                                     "Mion • Makima • Görüşürüz ❤️"
                             })
                             .setTimestamp();
-
-                    // =================================================
-                    // MESAJ
-                    // =================================================
 
                     await channel.send({
                         embeds: [
@@ -1175,11 +1115,11 @@ module.exports = {
         );
 
         // =================================================
-        // SISTEM AKTIF
+        // SISTEM
         // =================================================
 
         console.log(
-            "✓ Mion • Makima hoş geldin / görüşürüz sistemi aktif."
+            "✓ Mion • Makima Hoş Geldin / Görüşürüz sistemi aktif."
         );
     }
 };
