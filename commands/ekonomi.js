@@ -1,3 +1,4 @@
+
 const {
     SlashCommandBuilder,
     EmbedBuilder,
@@ -8,7 +9,7 @@ const fs = require("fs");
 const path = require("path");
 
 // =====================================================
-// DOSYA
+// DOSYA SİSTEMİ
 // =====================================================
 
 const dataKlasoru = path.join(__dirname, "..", "data");
@@ -23,7 +24,7 @@ if (!fs.existsSync(dataDosyasi)) {
 }
 
 // =====================================================
-// VERİ FONKSİYONLARI
+// VERİ SİSTEMİ
 // =====================================================
 
 function verileriOku() {
@@ -36,31 +37,50 @@ function verileriOku() {
 
         const parsed = JSON.parse(veri);
 
-        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        if (
+            !parsed ||
+            typeof parsed !== "object" ||
+            Array.isArray(parsed)
+        ) {
             return {};
         }
 
         return parsed;
     } catch (error) {
-        console.error("Ekonomi JSON okuma hatası:", error);
+        console.error("❌ Ekonomi JSON okuma hatası:", error);
+
+        // Bozuk JSON yüzünden sistemi tamamen durdurmamak için
+        // mevcut dosyayı yedekliyoruz.
+        try {
+            const backup = `${dataDosyasi}.backup-${Date.now()}`;
+            fs.copyFileSync(dataDosyasi, backup);
+        } catch {}
+
         return {};
     }
 }
 
 function verileriKaydet(data) {
     try {
+        const geciciDosya = `${dataDosyasi}.tmp`;
+
         fs.writeFileSync(
-            dataDosyasi,
+            geciciDosya,
             JSON.stringify(data, null, 4),
             "utf8"
         );
+
+        fs.renameSync(geciciDosya, dataDosyasi);
+
+        return true;
     } catch (error) {
-        console.error("Ekonomi JSON kaydetme hatası:", error);
+        console.error("❌ Ekonomi JSON kaydetme hatası:", error);
+        return false;
     }
 }
 
 // =====================================================
-// TARİH
+// TARİH / ZAMAN
 // =====================================================
 
 function bugun() {
@@ -73,6 +93,37 @@ function bugun() {
     return `${yil}-${ay}-${gun}`;
 }
 
+function kalanSure(ms) {
+    if (ms <= 0) return "Hazır";
+
+    const toplamSaniye = Math.ceil(ms / 1000);
+
+    const gun = Math.floor(toplamSaniye / 86400);
+    const saat = Math.floor((toplamSaniye % 86400) / 3600);
+    const dakika = Math.floor((toplamSaniye % 3600) / 60);
+    const saniye = toplamSaniye % 60;
+
+    const parcalar = [];
+
+    if (gun > 0) parcalar.push(`${gun} gün`);
+    if (saat > 0) parcalar.push(`${saat} saat`);
+    if (dakika > 0) parcalar.push(`${dakika} dk`);
+
+    if (gun === 0 && saat === 0) {
+        parcalar.push(`${saniye} sn`);
+    }
+
+    return parcalar.join(" ");
+}
+
+function cooldownKalan(sonKullanim, cooldown) {
+    if (!sonKullanim) return 0;
+
+    const kalan = cooldown - (Date.now() - sonKullanim);
+
+    return Math.max(0, kalan);
+}
+
 // =====================================================
 // FORMAT
 // =====================================================
@@ -80,6 +131,36 @@ function bugun() {
 function paraFormatla(sayi) {
     return Number(sayi || 0).toLocaleString("tr-TR");
 }
+
+function yuzdeFormatla(sayi) {
+    return `${Number(sayi || 0).toLocaleString("tr-TR", {
+        maximumFractionDigits: 2
+    })}%`;
+}
+
+function ilerlemeCubugu(mevcut, hedef, uzunluk = 10) {
+    if (hedef <= 0) {
+        return "██████████";
+    }
+
+    const oran = Math.min(1, Math.max(0, mevcut / hedef));
+    const dolu = Math.round(oran * uzunluk);
+
+    return (
+        "█".repeat(dolu) +
+        "░".repeat(uzunluk - dolu)
+    );
+}
+
+function paraYuzdesi(deger, toplam) {
+    if (!toplam || toplam <= 0) return 0;
+
+    return (deger / toplam) * 100;
+}
+
+// =====================================================
+// EMBED SİSTEMİ
+// =====================================================
 
 function embedBaslik(baslik, aciklama) {
     return new EmbedBuilder()
@@ -89,61 +170,240 @@ function embedBaslik(baslik, aciklama) {
         .setTimestamp();
 }
 
+function kullaniciFooter(embed, user) {
+    return embed.setFooter({
+        text: `${user.username} • Ekonomi Sistemi`,
+        iconURL: user.displayAvatarURL()
+    });
+}
+
 // =====================================================
-// HESAP OLUŞTUR
+// MESLEKLER
+// =====================================================
+
+const meslekler = {
+    issiz: {
+        isim: "İşsiz",
+        emoji: "🧑",
+        min: 50,
+        max: 150,
+        aciklama: "Herhangi bir mesleğe bağlı olmadan çalışırsın."
+    },
+
+    madenci: {
+        isim: "Madenci",
+        emoji: "⛏️",
+        min: 100,
+        max: 300,
+        aciklama: "Madenlerde çalışarak düzenli gelir elde edersin."
+    },
+
+    yazilimci: {
+        isim: "Yazılımcı",
+        emoji: "💻",
+        min: 200,
+        max: 500,
+        aciklama: "Kod yazarak yüksek gelir elde edersin."
+    },
+
+    doktor: {
+        isim: "Doktor",
+        emoji: "🩺",
+        min: 300,
+        max: 700,
+        aciklama: "Sağlık sektöründeki yüksek maaşlı meslek."
+    },
+
+    muhendis: {
+        isim: "Mühendis",
+        emoji: "⚙️",
+        min: 250,
+        max: 600,
+        aciklama: "Teknik projeler üzerinde çalışırsın."
+    },
+
+    tasarimci: {
+        isim: "Tasarımcı",
+        emoji: "🎨",
+        min: 150,
+        max: 400,
+        aciklama: "Tasarım yaparak para kazanırsın."
+    }
+};
+
+// =====================================================
+// MARKET
+// =====================================================
+
+const market = {
+    elma: {
+        isim: "Elma",
+        emoji: "🍎",
+        fiyat: 100,
+        satis: 60,
+        kategori: "Tüketilebilir",
+        aciklama: "Basit ama ekonomik bir yiyecek."
+    },
+
+    kahve: {
+        isim: "Kahve",
+        emoji: "☕",
+        fiyat: 250,
+        satis: 150,
+        kategori: "Tüketilebilir",
+        aciklama: "Günün enerjisini artıran klasik içecek."
+    },
+
+    pizza: {
+        isim: "Pizza",
+        emoji: "🍕",
+        fiyat: 500,
+        satis: 300,
+        kategori: "Tüketilebilir",
+        aciklama: "Lezzetli ve pahalı bir yiyecek."
+    },
+
+    laptop: {
+        isim: "Laptop",
+        emoji: "💻",
+        fiyat: 5000,
+        satis: 3000,
+        kategori: "Elektronik",
+        aciklama: "Çalışma ve teknoloji için güçlü cihaz."
+    },
+
+    araba: {
+        isim: "Araba",
+        emoji: "🚗",
+        fiyat: 25000,
+        satis: 15000,
+        kategori: "Araç",
+        aciklama: "Ekonomi sistemindeki en değerli eşyalardan biri."
+    }
+};
+
+// =====================================================
+// SABİTLER
+// =====================================================
+
+const BANKA_LIMITI = 1_000_000;
+const FAIZ_ORANI = 0.02;
+
+const GUNLUK_MIN = 500;
+const GUNLUK_MAX = 1000;
+
+const CALISMA_COOLDOWN = 60 * 1000;
+const GUNLUK_COOLDOWN = 24 * 60 * 60 * 1000;
+const FAIZ_COOLDOWN = 24 * 60 * 60 * 1000;
+const SOYGUN_COOLDOWN = 30 * 60 * 1000;
+
+const KASA_FIYAT = 5000;
+const KASA_MIN = 1000;
+const KASA_MAX = 10000;
+
+// =====================================================
+// HESAP OLUŞTURMA
 // =====================================================
 
 function hesapOlustur(data, guildId, userId) {
-    if (!data[guildId] || typeof data[guildId] !== "object") {
+
+    if (
+        !data[guildId] ||
+        typeof data[guildId] !== "object" ||
+        Array.isArray(data[guildId])
+    ) {
         data[guildId] = {};
     }
 
-    if (!data[guildId][userId] || typeof data[guildId][userId] !== "object") {
+    if (
+        !data[guildId][userId] ||
+        typeof data[guildId][userId] !== "object" ||
+        Array.isArray(data[guildId][userId])
+    ) {
         data[guildId][userId] = {};
     }
 
     const hesap = data[guildId][userId];
 
-    // Temel değerler
-    if (typeof hesap.para !== "number") hesap.para = 0;
-    if (typeof hesap.banka !== "number") hesap.banka = 0;
+    // =================================================
+    // TEMEL PARA
+    // =================================================
 
-    if (typeof hesap.toplamKazanilan !== "number") {
+    if (typeof hesap.para !== "number" || !Number.isFinite(hesap.para)) {
+        hesap.para = 0;
+    }
+
+    if (typeof hesap.banka !== "number" || !Number.isFinite(hesap.banka)) {
+        hesap.banka = 0;
+    }
+
+    if (
+        typeof hesap.toplamKazanilan !== "number" ||
+        !Number.isFinite(hesap.toplamKazanilan)
+    ) {
         hesap.toplamKazanilan = 0;
     }
 
-    if (typeof hesap.toplamHarcanan !== "number") {
+    if (
+        typeof hesap.toplamHarcanan !== "number" ||
+        !Number.isFinite(hesap.toplamHarcanan)
+    ) {
         hesap.toplamHarcanan = 0;
     }
 
-    // Cooldownlar
+    // =================================================
+    // COOLDOWN
+    // =================================================
+
     if (typeof hesap.sonGunluk !== "number") hesap.sonGunluk = 0;
     if (typeof hesap.sonCalisma !== "number") hesap.sonCalisma = 0;
     if (typeof hesap.sonFaiz !== "number") hesap.sonFaiz = 0;
     if (typeof hesap.sonSoygun !== "number") hesap.sonSoygun = 0;
     if (typeof hesap.sonKasa !== "number") hesap.sonKasa = 0;
 
-    // Meslek
+    // =================================================
+    // MESLEK
+    // =================================================
+
     if (typeof hesap.meslek !== "string") {
         hesap.meslek = "İşsiz";
     }
 
-    // Kasa
-    if (typeof hesap.kasa !== "number") {
+    // =================================================
+    // KASA
+    // =================================================
+
+    if (
+        typeof hesap.kasa !== "number" ||
+        !Number.isFinite(hesap.kasa)
+    ) {
         hesap.kasa = 0;
     }
 
-    // Envanter
-    if (!hesap.envanter || typeof hesap.envanter !== "object") {
+    // =================================================
+    // ENVANTER
+    // =================================================
+
+    if (
+        !hesap.envanter ||
+        typeof hesap.envanter !== "object" ||
+        Array.isArray(hesap.envanter)
+    ) {
         hesap.envanter = {};
     }
 
-    // Görevler
+    // =================================================
+    // GÖREVLER
+    // =================================================
+
     if (typeof hesap.gorevTarih !== "string") {
         hesap.gorevTarih = bugun();
     }
 
-    if (!hesap.gorevler || typeof hesap.gorevler !== "object") {
+    if (
+        !hesap.gorevler ||
+        typeof hesap.gorevler !== "object"
+    ) {
         hesap.gorevler = {};
     }
 
@@ -159,7 +419,10 @@ function hesapOlustur(data, guildId, userId) {
         hesap.gorevler.market = 0;
     }
 
-    if (!hesap.gorevOdulleri || typeof hesap.gorevOdulleri !== "object") {
+    if (
+        !hesap.gorevOdulleri ||
+        typeof hesap.gorevOdulleri !== "object"
+    ) {
         hesap.gorevOdulleri = {};
     }
 
@@ -175,19 +438,55 @@ function hesapOlustur(data, guildId, userId) {
         hesap.gorevOdulleri.market = false;
     }
 
+    // =================================================
+    // İSTATİSTİKLER
+    // =================================================
+
+    if (!hesap.istatistik || typeof hesap.istatistik !== "object") {
+        hesap.istatistik = {};
+    }
+
+    const istatistikAlanlari = [
+        "calisma",
+        "gunluk",
+        "transfer",
+        "satinAlma",
+        "satis",
+        "soygun",
+        "basariliSoygun",
+        "basarisizSoygun",
+        "faiz",
+        "kasa"
+    ];
+
+    for (const alan of istatistikAlanlari) {
+        if (
+            typeof hesap.istatistik[alan] !== "number" ||
+            !Number.isFinite(hesap.istatistik[alan])
+        ) {
+            hesap.istatistik[alan] = 0;
+        }
+    }
+
+    // =================================================
+    // GÜNLÜK GÖREV KONTROL
+    // =================================================
+
     gorevleriKontrolEt(hesap);
 
     return hesap;
 }
 
 // =====================================================
-// GÜNLÜK GÖREV KONTROL
+// GÖREV SIFIRLAMA
 // =====================================================
 
 function gorevleriKontrolEt(hesap) {
+
     const tarih = bugun();
 
     if (hesap.gorevTarih !== tarih) {
+
         hesap.gorevTarih = tarih;
 
         hesap.gorevler = {
@@ -205,71 +504,40 @@ function gorevleriKontrolEt(hesap) {
 }
 
 // =====================================================
-// MESLEKLER
+// PARA EKLE
 // =====================================================
 
-const meslekler = {
-    madenci: {
-        isim: "Madenci",
-        min: 100,
-        max: 300
-    },
-
-    yazilimci: {
-        isim: "Yazılımcı",
-        min: 200,
-        max: 500
-    },
-
-    doktor: {
-        isim: "Doktor",
-        min: 300,
-        max: 700
-    },
-
-    muhendis: {
-        isim: "Mühendis",
-        min: 250,
-        max: 600
-    },
-
-    tasarimci: {
-        isim: "Tasarımcı",
-        min: 150,
-        max: 400
-    }
-};
+function paraEkle(hesap, miktar) {
+    hesap.para += miktar;
+    hesap.toplamKazanilan += miktar;
+}
 
 // =====================================================
-// MARKET
+// PARA ÇIKAR
 // =====================================================
 
-const market = {
-    elma: {
-        isim: "Elma",
-        fiyat: 100
-    },
+function paraCikar(hesap, miktar) {
+    hesap.para = Math.max(0, hesap.para - miktar);
+    hesap.toplamHarcanan += miktar;
+}
 
-    kahve: {
-        isim: "Kahve",
-        fiyat: 250
-    },
+// =====================================================
+// GÖREV DURUMU
+// =====================================================
 
-    pizza: {
-        isim: "Pizza",
-        fiyat: 500
-    },
+function gorevDurumu(mevcut, hedef) {
 
-    laptop: {
-        isim: "Laptop",
-        fiyat: 5000
-    },
+    const oran = Math.min(
+        100,
+        (mevcut / hedef) * 100
+    );
 
-    araba: {
-        isim: "Araba",
-        fiyat: 25000
-    }
-};
+    return (
+        `${ilerlemeCubugu(mevcut, hedef, 8)} ` +
+        `**${Math.min(mevcut, hedef)}/${hedef}**\n` +
+        `İlerleme: **${yuzdeFormatla(oran)}**`
+    );
+}
 
 // =====================================================
 // KOMUT
@@ -277,16 +545,16 @@ const market = {
 
 const data = new SlashCommandBuilder()
     .setName("ekonomi")
-    .setDescription("Ekonomi sistemini kullan.")
+    .setDescription("Gelişmiş ekonomi sistemini kullan.")
 
-// -----------------------------------------------------
-// BAKİYE
-// -----------------------------------------------------
+    // =================================================
+    // BAKİYE
+    // =================================================
 
     .addSubcommand(sub =>
         sub
             .setName("bakiye")
-            .setDescription("Bakiye bilgini gösterir.")
+            .setDescription("Detaylı ekonomi ve servet bilgini gösterir.")
             .addUserOption(option =>
                 option
                     .setName("uye")
@@ -295,9 +563,9 @@ const data = new SlashCommandBuilder()
             )
     )
 
-// -----------------------------------------------------
-// GÜNLÜK
-// -----------------------------------------------------
+    // =================================================
+    // GÜNLÜK
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -305,19 +573,19 @@ const data = new SlashCommandBuilder()
             .setDescription("Günlük para ödülünü al.")
     )
 
-// -----------------------------------------------------
-// ÇALIŞ
-// -----------------------------------------------------
+    // =================================================
+    // ÇALIŞ
+    // =================================================
 
     .addSubcommand(sub =>
         sub
             .setName("calis")
-            .setDescription("Çalışarak para kazan.")
+            .setDescription("Mesleğine göre çalışarak para kazan.")
     )
 
-// -----------------------------------------------------
-// MESLEK
-// -----------------------------------------------------
+    // =================================================
+    // MESLEK
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -329,19 +597,37 @@ const data = new SlashCommandBuilder()
                     .setDescription("Seçilecek meslek.")
                     .setRequired(true)
                     .addChoices(
-                        { name: "İşsiz", value: "issiz" },
-                        { name: "Madenci", value: "madenci" },
-                        { name: "Yazılımcı", value: "yazilimci" },
-                        { name: "Doktor", value: "doktor" },
-                        { name: "Mühendis", value: "muhendis" },
-                        { name: "Tasarımcı", value: "tasarimci" }
+                        {
+                            name: "İşsiz",
+                            value: "issiz"
+                        },
+                        {
+                            name: "Madenci",
+                            value: "madenci"
+                        },
+                        {
+                            name: "Yazılımcı",
+                            value: "yazilimci"
+                        },
+                        {
+                            name: "Doktor",
+                            value: "doktor"
+                        },
+                        {
+                            name: "Mühendis",
+                            value: "muhendis"
+                        },
+                        {
+                            name: "Tasarımcı",
+                            value: "tasarimci"
+                        }
                     )
             )
     )
 
-// -----------------------------------------------------
-// TRANSFER
-// -----------------------------------------------------
+    // =================================================
+    // TRANSFER
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -356,15 +642,15 @@ const data = new SlashCommandBuilder()
             .addIntegerOption(option =>
                 option
                     .setName("miktar")
-                    .setDescription("Gönderilecek miktar.")
+                    .setDescription("Gönderilecek para.")
                     .setMinValue(1)
                     .setRequired(true)
             )
     )
 
-// -----------------------------------------------------
-// ZENGİNLER
-// -----------------------------------------------------
+    // =================================================
+    // ZENGİNLER
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -372,14 +658,14 @@ const data = new SlashCommandBuilder()
             .setDescription("Sunucunun en zengin kullanıcılarını gösterir.")
     )
 
-// -----------------------------------------------------
-// ENVANTER
-// -----------------------------------------------------
+    // =================================================
+    // ENVANTER
+    // =================================================
 
     .addSubcommand(sub =>
         sub
             .setName("envanter")
-            .setDescription("Envanterini gösterir.")
+            .setDescription("Detaylı envanterini gösterir.")
             .addUserOption(option =>
                 option
                     .setName("uye")
@@ -388,19 +674,19 @@ const data = new SlashCommandBuilder()
             )
     )
 
-// -----------------------------------------------------
-// MARKET
-// -----------------------------------------------------
+    // =================================================
+    // MARKET
+    // =================================================
 
     .addSubcommand(sub =>
         sub
             .setName("market")
-            .setDescription("Ekonomi marketini gösterir.")
+            .setDescription("Ekonomi marketini detaylı gösterir.")
     )
 
-// -----------------------------------------------------
-// SATIN AL
-// -----------------------------------------------------
+    // =================================================
+    // SATIN AL
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -412,11 +698,26 @@ const data = new SlashCommandBuilder()
                     .setDescription("Satın alınacak eşya.")
                     .setRequired(true)
                     .addChoices(
-                        { name: "Elma - 100", value: "elma" },
-                        { name: "Kahve - 250", value: "kahve" },
-                        { name: "Pizza - 500", value: "pizza" },
-                        { name: "Laptop - 5.000", value: "laptop" },
-                        { name: "Araba - 25.000", value: "araba" }
+                        {
+                            name: "🍎 Elma - 100",
+                            value: "elma"
+                        },
+                        {
+                            name: "☕ Kahve - 250",
+                            value: "kahve"
+                        },
+                        {
+                            name: "🍕 Pizza - 500",
+                            value: "pizza"
+                        },
+                        {
+                            name: "💻 Laptop - 5.000",
+                            value: "laptop"
+                        },
+                        {
+                            name: "🚗 Araba - 25.000",
+                            value: "araba"
+                        }
                     )
             )
             .addIntegerOption(option =>
@@ -429,9 +730,9 @@ const data = new SlashCommandBuilder()
             )
     )
 
-// -----------------------------------------------------
-// SAT
-// -----------------------------------------------------
+    // =================================================
+    // SAT
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -443,11 +744,26 @@ const data = new SlashCommandBuilder()
                     .setDescription("Satılacak eşya.")
                     .setRequired(true)
                     .addChoices(
-                        { name: "Elma", value: "elma" },
-                        { name: "Kahve", value: "kahve" },
-                        { name: "Pizza", value: "pizza" },
-                        { name: "Laptop", value: "laptop" },
-                        { name: "Araba", value: "araba" }
+                        {
+                            name: "🍎 Elma",
+                            value: "elma"
+                        },
+                        {
+                            name: "☕ Kahve",
+                            value: "kahve"
+                        },
+                        {
+                            name: "🍕 Pizza",
+                            value: "pizza"
+                        },
+                        {
+                            name: "💻 Laptop",
+                            value: "laptop"
+                        },
+                        {
+                            name: "🚗 Araba",
+                            value: "araba"
+                        }
                     )
             )
             .addIntegerOption(option =>
@@ -460,19 +776,19 @@ const data = new SlashCommandBuilder()
             )
     )
 
-// -----------------------------------------------------
-// BANKA
-// -----------------------------------------------------
+    // =================================================
+    // BANKA
+    // =================================================
 
     .addSubcommand(sub =>
         sub
             .setName("banka")
-            .setDescription("Banka bakiyeni gösterir.")
+            .setDescription("Detaylı banka bilgilerini gösterir.")
     )
 
-// -----------------------------------------------------
-// YATIR
-// -----------------------------------------------------
+    // =================================================
+    // YATIR
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -481,15 +797,15 @@ const data = new SlashCommandBuilder()
             .addIntegerOption(option =>
                 option
                     .setName("miktar")
-                    .setDescription("Yatırılacak miktar.")
+                    .setDescription("Yatırılacak para.")
                     .setMinValue(1)
                     .setRequired(true)
             )
     )
 
-// -----------------------------------------------------
-// ÇEK
-// -----------------------------------------------------
+    // =================================================
+    // ÇEK
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -498,15 +814,15 @@ const data = new SlashCommandBuilder()
             .addIntegerOption(option =>
                 option
                     .setName("miktar")
-                    .setDescription("Çekilecek miktar.")
+                    .setDescription("Çekilecek para.")
                     .setMinValue(1)
                     .setRequired(true)
             )
     )
 
-// -----------------------------------------------------
-// FAİZ
-// -----------------------------------------------------
+    // =================================================
+    // FAİZ
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -514,19 +830,19 @@ const data = new SlashCommandBuilder()
             .setDescription("Bankadaki paran için faiz al.")
     )
 
-// -----------------------------------------------------
-// KASA
-// -----------------------------------------------------
+    // =================================================
+    // KASA
+    // =================================================
 
     .addSubcommand(sub =>
         sub
             .setName("kasa")
-            .setDescription("Kasa bilgini gösterir.")
+            .setDescription("Kasa bilgilerini ve durumunu gösterir.")
     )
 
-// -----------------------------------------------------
-// KASA AÇ
-// -----------------------------------------------------
+    // =================================================
+    // KASA AÇ
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -534,9 +850,9 @@ const data = new SlashCommandBuilder()
             .setDescription("5.000 para karşılığında kasa aç.")
     )
 
-// -----------------------------------------------------
-// SOYGUN
-// -----------------------------------------------------
+    // =================================================
+    // SOYGUN
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -550,19 +866,19 @@ const data = new SlashCommandBuilder()
             )
     )
 
-// -----------------------------------------------------
-// GÖREVLER
-// -----------------------------------------------------
+    // =================================================
+    // GÖREVLER
+    // =================================================
 
     .addSubcommand(sub =>
         sub
             .setName("gorevler")
-            .setDescription("Günlük görevlerini gösterir.")
+            .setDescription("Günlük görevlerini detaylı gösterir.")
     )
 
-// -----------------------------------------------------
-// GÖREV ÖDÜLÜ
-// -----------------------------------------------------
+    // =================================================
+    // GÖREV ÖDÜLÜ
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -570,9 +886,9 @@ const data = new SlashCommandBuilder()
             .setDescription("Tamamladığın görevlerin ödülünü al.")
     )
 
-// -----------------------------------------------------
-// GÖREV SIFIRLA
-// -----------------------------------------------------
+    // =================================================
+    // GÖREV SIFIRLA
+    // =================================================
 
     .addSubcommand(sub =>
         sub
@@ -586,14 +902,14 @@ const data = new SlashCommandBuilder()
             )
     )
 
-// -----------------------------------------------------
-// PARA VER
-// -----------------------------------------------------
+    // =================================================
+    // PARA VER
+    // =================================================
 
     .addSubcommand(sub =>
         sub
             .setName("para-ver")
-            .setDescription("Bir kullanıcıya para verir.")
+            .setDescription("Bir kullanıcıya ekonomi parası verir.")
             .addUserOption(option =>
                 option
                     .setName("uye")
@@ -603,20 +919,20 @@ const data = new SlashCommandBuilder()
             .addIntegerOption(option =>
                 option
                     .setName("miktar")
-                    .setDescription("Verilecek para miktarı.")
+                    .setDescription("Verilecek para.")
                     .setMinValue(1)
                     .setRequired(true)
             )
     )
 
-// -----------------------------------------------------
-// PARA AL
-// -----------------------------------------------------
+    // =================================================
+    // PARA AL
+    // =================================================
 
     .addSubcommand(sub =>
         sub
             .setName("para-al")
-            .setDescription("Bir kullanıcıdan para alır.")
+            .setDescription("Bir kullanıcının cüzdanından para alır.")
             .addUserOption(option =>
                 option
                     .setName("uye")
@@ -626,7 +942,7 @@ const data = new SlashCommandBuilder()
             .addIntegerOption(option =>
                 option
                     .setName("miktar")
-                    .setDescription("Alınacak para miktarı.")
+                    .setDescription("Alınacak para.")
                     .setMinValue(1)
                     .setRequired(true)
             )
@@ -652,9 +968,13 @@ async function execute(interaction) {
         const userId = interaction.user.id;
         const guildId = interaction.guild.id;
 
-        const hesap = hesapOlustur(data, guildId, userId);
+        const hesap = hesapOlustur(
+            data,
+            guildId,
+            userId
+        );
 
-        // Tarih değiştiyse kaydet
+        // Tarih değiştiyse görevleri yenile
         verileriKaydet(data);
 
         const komut = interaction.options.getSubcommand();
@@ -665,13 +985,16 @@ async function execute(interaction) {
 
         if (komut === "bakiye") {
 
-            const uye = interaction.options.getUser("uye") || interaction.user;
+            const uye =
+                interaction.options.getUser("uye") ||
+                interaction.user;
 
-            const hedefHesap = hesapOlustur(
-                data,
-                guildId,
-                uye.id
-            );
+            const hedefHesap =
+                hesapOlustur(
+                    data,
+                    guildId,
+                    uye.id
+                );
 
             verileriKaydet(data);
 
@@ -679,43 +1002,94 @@ async function execute(interaction) {
                 hedefHesap.para +
                 hedefHesap.banka;
 
+            const toplamHareket =
+                hedefHesap.toplamKazanilan +
+                hedefHesap.toplamHarcanan;
+
+            const bankaOrani =
+                Math.min(
+                    100,
+                    (hedefHesap.banka / BANKA_LIMITI) * 100
+                );
+
+            const meslek =
+                Object.values(meslekler)
+                    .find(x => x.isim === hedefHesap.meslek);
+
             const embed = embedBaslik(
                 "💰 Ekonomi • Bakiye",
-                `**${uye.username}** adlı kullanıcının ekonomi bilgileri`
+                `### ${uye.username}\n` +
+                `Kullanıcının detaylı ekonomi özeti aşağıdadır.`
+            );
+
+            embed.setThumbnail(
+                uye.displayAvatarURL({
+                    size: 256
+                })
             );
 
             embed.addFields(
                 {
                     name: "💵 Cüzdan",
-                    value: `${paraFormatla(hedefHesap.para)} para`,
+                    value:
+                        `**${paraFormatla(hedefHesap.para)}** para`,
                     inline: true
                 },
                 {
                     name: "🏦 Banka",
-                    value: `${paraFormatla(hedefHesap.banka)} para`,
+                    value:
+                        `**${paraFormatla(hedefHesap.banka)}** para`,
                     inline: true
                 },
                 {
-                    name: "💎 Toplam",
-                    value: `${paraFormatla(toplam)} para`,
+                    name: "💎 Toplam Servet",
+                    value:
+                        `**${paraFormatla(toplam)}** para`,
                     inline: true
                 },
                 {
                     name: "💼 Meslek",
-                    value: hedefHesap.meslek,
+                    value:
+                        `${meslek?.emoji || "🧑"} **${hedefHesap.meslek}**`,
                     inline: true
                 },
                 {
-                    name: "📈 Kazanılan",
-                    value: `${paraFormatla(hedefHesap.toplamKazanilan)} para`,
+                    name: "📈 Toplam Kazanç",
+                    value:
+                        `**${paraFormatla(hedefHesap.toplamKazanilan)}**`,
                     inline: true
                 },
                 {
-                    name: "📉 Harcanan",
-                    value: `${paraFormatla(hedefHesap.toplamHarcanan)} para`,
+                    name: "📉 Toplam Harcama",
+                    value:
+                        `**${paraFormatla(hedefHesap.toplamHarcanan)}**`,
                     inline: true
+                },
+                {
+                    name: "🏦 Banka Kullanımı",
+                    value:
+                        `${ilerlemeCubugu(
+                            hedefHesap.banka,
+                            BANKA_LIMITI,
+                            12
+                        )}\n` +
+                        `**${yuzdeFormatla(bankaOrani)}** • ` +
+                        `${paraFormatla(
+                            BANKA_LIMITI - hedefHesap.banka
+                        )} limit kaldı`,
+                    inline: false
+                },
+                {
+                    name: "📊 Ekonomi Hareketleri",
+                    value:
+                        `💰 Kazanç: **${paraFormatla(hedefHesap.toplamKazanilan)}**\n` +
+                        `💸 Harcama: **${paraFormatla(hedefHesap.toplamHarcanan)}**\n` +
+                        `🔄 Toplam hareket: **${paraFormatla(toplamHareket)}**`,
+                    inline: false
                 }
             );
+
+            kullaniciFooter(embed, uye);
 
             return interaction.reply({
                 embeds: [embed]
@@ -728,48 +1102,81 @@ async function execute(interaction) {
 
         if (komut === "gunluk") {
 
-            const simdi = Date.now();
+            const kalan =
+                cooldownKalan(
+                    hesap.sonGunluk,
+                    GUNLUK_COOLDOWN
+                );
 
-            if (
-                hesap.sonGunluk &&
-                simdi - hesap.sonGunluk < 24 * 60 * 60 * 1000
-            ) {
-                const kalan =
-                    24 * 60 * 60 * 1000 -
-                    (simdi - hesap.sonGunluk);
+            if (kalan > 0) {
 
-                const saat = Math.floor(kalan / 3600000);
-                const dakika = Math.floor(
-                    (kalan % 3600000) / 60000
+                const embed = embedBaslik(
+                    "⏳ Günlük Ödül",
+                    `Günlük ödülünü zaten aldın.\n\n` +
+                    `⏰ Yeniden alabilmek için:\n` +
+                    `**${kalanSure(kalan)}** beklemelisin.`
                 );
 
                 return interaction.reply({
-                    embeds: [
-                        embedBaslik(
-                            "⏳ Günlük Ödül",
-                            `Günlük ödülünü zaten aldın.\n\nTekrar alabilmek için **${saat} saat ${dakika} dakika** beklemelisin.`
-                        )
-                    ],
+                    embeds: [embed],
                     ephemeral: true
                 });
             }
 
             const odul =
-                Math.floor(Math.random() * 501) + 500;
+                Math.floor(
+                    Math.random() *
+                    (GUNLUK_MAX - GUNLUK_MIN + 1)
+                ) + GUNLUK_MIN;
 
-            hesap.para += odul;
-            hesap.toplamKazanilan += odul;
-            hesap.sonGunluk = simdi;
+            const eskiBakiye = hesap.para;
+
+            paraEkle(hesap, odul);
+
+            hesap.sonGunluk = Date.now();
+            hesap.istatistik.gunluk++;
 
             verileriKaydet(data);
 
+            const embed = embedBaslik(
+                "🎁 Günlük Ödül Alındı",
+                `Bugünkü günlük ödülünü başarıyla aldın.`
+            );
+
+            embed.addFields(
+                {
+                    name: "🎁 Ödül",
+                    value:
+                        `**+${paraFormatla(odul)} para**`,
+                    inline: true
+                },
+                {
+                    name: "💵 Önceki Bakiye",
+                    value:
+                        `**${paraFormatla(eskiBakiye)}**`,
+                    inline: true
+                },
+                {
+                    name: "💰 Yeni Bakiye",
+                    value:
+                        `**${paraFormatla(hesap.para)}**`,
+                    inline: true
+                },
+                {
+                    name: "📅 Sonraki Ödül",
+                    value:
+                        `Yaklaşık **24 saat** sonra`,
+                    inline: false
+                }
+            );
+
+            kullaniciFooter(
+                embed,
+                interaction.user
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "🎁 Günlük Ödül",
-                        `Bugünkü ödülünü aldın!\n\n💰 Kazandığın: **${paraFormatla(odul)} para**\n💵 Yeni bakiye: **${paraFormatla(hesap.para)} para**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -779,60 +1186,106 @@ async function execute(interaction) {
 
         if (komut === "calis") {
 
-            const simdi = Date.now();
-
-            if (
-                hesap.sonCalisma &&
-                simdi - hesap.sonCalisma < 60 * 1000
-            ) {
-                const kalan = Math.ceil(
-                    (60000 - (simdi - hesap.sonCalisma)) / 1000
+            const kalan =
+                cooldownKalan(
+                    hesap.sonCalisma,
+                    CALISMA_COOLDOWN
                 );
 
+            if (kalan > 0) {
+
                 return interaction.reply({
-                    content: `⏳ Tekrar çalışmak için **${kalan} saniye** beklemelisin.`,
+                    embeds: [
+                        embedBaslik(
+                            "⏳ Çalışma Bekleme Süresi",
+                            `Tekrar çalışabilmek için **${kalanSure(kalan)}** beklemelisin.`
+                        )
+                    ],
                     ephemeral: true
                 });
             }
 
-            let kazanc;
+            let meslekBilgisi;
 
             if (hesap.meslek === "İşsiz") {
-
-                kazanc =
-                    Math.floor(Math.random() * 101) + 50;
-
+                meslekBilgisi = meslekler.issiz;
             } else {
-
-                const meslek = Object.values(meslekler)
-                    .find(x => x.isim === hesap.meslek);
-
-                if (meslek) {
-                    kazanc =
-                        Math.floor(
-                            Math.random() *
-                            (meslek.max - meslek.min + 1)
-                        ) + meslek.min;
-                } else {
-                    kazanc =
-                        Math.floor(Math.random() * 101) + 50;
-                }
+                meslekBilgisi =
+                    Object.values(meslekler)
+                        .find(x => x.isim === hesap.meslek);
             }
 
-            hesap.para += kazanc;
-            hesap.toplamKazanilan += kazanc;
-            hesap.sonCalisma = simdi;
+            const kazanc =
+                Math.floor(
+                    Math.random() *
+                    (
+                        meslekBilgisi.max -
+                        meslekBilgisi.min +
+                        1
+                    )
+                ) +
+                meslekBilgisi.min;
+
+            const eskiBakiye = hesap.para;
+
+            paraEkle(hesap, kazanc);
+
+            hesap.sonCalisma = Date.now();
+
             hesap.gorevler.calisma++;
+            hesap.istatistik.calisma++;
 
             verileriKaydet(data);
 
+            const embed = embedBaslik(
+                "💼 Çalışma Tamamlandı",
+                `${meslekBilgisi.emoji} **${hesap.meslek}** olarak çalıştın ve para kazandın.`
+            );
+
+            embed.addFields(
+                {
+                    name: "💼 Meslek",
+                    value:
+                        `**${hesap.meslek}**`,
+                    inline: true
+                },
+                {
+                    name: "💰 Kazanç",
+                    value:
+                        `**+${paraFormatla(kazanc)}**`,
+                    inline: true
+                },
+                {
+                    name: "💵 Yeni Bakiye",
+                    value:
+                        `**${paraFormatla(hesap.para)}**`,
+                    inline: true
+                },
+                {
+                    name: "📊 Meslek Gelir Aralığı",
+                    value:
+                        `${paraFormatla(meslekBilgisi.min)} - ` +
+                        `${paraFormatla(meslekBilgisi.max)} para`,
+                    inline: false
+                },
+                {
+                    name: "📋 Günlük Çalışma Görevi",
+                    value:
+                        gorevDurumu(
+                            hesap.gorevler.calisma,
+                            5
+                        ),
+                    inline: false
+                }
+            );
+
+            kullaniciFooter(
+                embed,
+                interaction.user
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "💼 Çalıştın!",
-                        `Çalışarak **${paraFormatla(kazanc)} para** kazandın.\n\n💵 Cüzdan: **${paraFormatla(hesap.para)} para**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -842,33 +1295,67 @@ async function execute(interaction) {
 
         if (komut === "meslek") {
 
-            const sec = interaction.options.getString("sec");
+            const sec =
+                interaction.options.getString("sec");
 
-            if (sec === "issiz") {
-
-                hesap.meslek = "İşsiz";
-
-            } else {
-
-                if (!meslekler[sec]) {
-                    return interaction.reply({
-                        content: "❌ Geçersiz meslek.",
-                        ephemeral: true
-                    });
-                }
-
-                hesap.meslek = meslekler[sec].isim;
+            if (!meslekler[sec]) {
+                return interaction.reply({
+                    content: "❌ Geçersiz meslek.",
+                    ephemeral: true
+                });
             }
+
+            const yeniMeslek =
+                meslekler[sec];
+
+            const eskiMeslek =
+                hesap.meslek;
+
+            hesap.meslek =
+                yeniMeslek.isim;
 
             verileriKaydet(data);
 
+            const embed = embedBaslik(
+                "💼 Meslek Güncellendi",
+                `Ekonomik kariyerin başarıyla güncellendi.`
+            );
+
+            embed.addFields(
+                {
+                    name: "↩️ Eski Meslek",
+                    value:
+                        `**${eskiMeslek}**`,
+                    inline: true
+                },
+                {
+                    name: "💼 Yeni Meslek",
+                    value:
+                        `${yeniMeslek.emoji} **${yeniMeslek.isim}**`,
+                    inline: true
+                },
+                {
+                    name: "💰 Kazanç Aralığı",
+                    value:
+                        `**${paraFormatla(yeniMeslek.min)}** - ` +
+                        `**${paraFormatla(yeniMeslek.max)}**`,
+                    inline: true
+                },
+                {
+                    name: "📖 Meslek Açıklaması",
+                    value:
+                        yeniMeslek.aciklama,
+                    inline: false
+                }
+            );
+
+            kullaniciFooter(
+                embed,
+                interaction.user
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "💼 Meslek Değiştirildi",
-                        `Yeni mesleğin: **${hesap.meslek}**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -878,8 +1365,11 @@ async function execute(interaction) {
 
         if (komut === "transfer") {
 
-            const uye = interaction.options.getUser("uye");
-            const miktar = interaction.options.getInteger("miktar");
+            const uye =
+                interaction.options.getUser("uye");
+
+            const miktar =
+                interaction.options.getInteger("miktar");
 
             if (!uye) {
                 return interaction.reply({
@@ -902,15 +1392,29 @@ async function execute(interaction) {
                 });
             }
 
+            if (miktar <= 0) {
+                return interaction.reply({
+                    content: "❌ Geçersiz para miktarı.",
+                    ephemeral: true
+                });
+            }
+
             if (hesap.para < miktar) {
                 return interaction.reply({
-                    content: "❌ Cüzdanında yeterli para yok.",
+                    content:
+                        `❌ Yeterli paran yok.\n\n` +
+                        `Gereken: **${paraFormatla(miktar)}**\n` +
+                        `Cüzdan: **${paraFormatla(hesap.para)}**`,
                     ephemeral: true
                 });
             }
 
             const hedefHesap =
-                hesapOlustur(data, guildId, uye.id);
+                hesapOlustur(
+                    data,
+                    guildId,
+                    uye.id
+                );
 
             hesap.para -= miktar;
             hedefHesap.para += miktar;
@@ -919,16 +1423,52 @@ async function execute(interaction) {
             hedefHesap.toplamKazanilan += miktar;
 
             hesap.gorevler.transfer++;
+            hesap.istatistik.transfer++;
 
             verileriKaydet(data);
 
+            const embed = embedBaslik(
+                "💸 Para Transferi",
+                `Para transferi başarıyla tamamlandı.`
+            );
+
+            embed.addFields(
+                {
+                    name: "👤 Alıcı",
+                    value:
+                        `${uye}`,
+                    inline: true
+                },
+                {
+                    name: "💰 Transfer",
+                    value:
+                        `**${paraFormatla(miktar)}**`,
+                    inline: true
+                },
+                {
+                    name: "💵 Yeni Bakiye",
+                    value:
+                        `**${paraFormatla(hesap.para)}**`,
+                    inline: true
+                },
+                {
+                    name: "📋 Transfer Görevi",
+                    value:
+                        gorevDurumu(
+                            hesap.gorevler.transfer,
+                            3
+                        ),
+                    inline: false
+                }
+            );
+
+            kullaniciFooter(
+                embed,
+                interaction.user
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "💸 Para Transferi",
-                        `**${uye.username}** kullanıcısına **${paraFormatla(miktar)} para** gönderdin.\n\n💵 Yeni bakiye: **${paraFormatla(hesap.para)} para**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -938,48 +1478,81 @@ async function execute(interaction) {
 
         if (komut === "zenginler") {
 
-            const sunucu = data[guildId] || {};
+            const sunucu =
+                data[guildId] || {};
 
-            const liste = Object.entries(sunucu)
-                .map(([id, hesap]) => ({
-                    id,
-                    toplam:
-                        Number(hesap.para || 0) +
-                        Number(hesap.banka || 0)
-                }))
-                .sort((a, b) => b.toplam - a.toplam)
-                .slice(0, 10);
+            const liste =
+                Object.entries(sunucu)
+                    .map(([id, hesap]) => ({
+                        id,
+                        toplam:
+                            Number(hesap.para || 0) +
+                            Number(hesap.banka || 0)
+                    }))
+                    .filter(x => x.toplam >= 0)
+                    .sort(
+                        (a, b) =>
+                            b.toplam - a.toplam
+                    )
+                    .slice(0, 10);
 
             if (liste.length === 0) {
                 return interaction.reply({
-                    content: "❌ Henüz ekonomi verisi bulunmuyor.",
+                    content:
+                        "❌ Henüz ekonomi verisi bulunmuyor.",
                     ephemeral: true
                 });
             }
 
             let metin = "";
 
-            for (let i = 0; i < liste.length; i++) {
+            for (
+                let i = 0;
+                i < liste.length;
+                i++
+            ) {
 
-                const uye = await interaction.client.users
-                    .fetch(liste[i].id)
-                    .catch(() => null);
+                const uye =
+                    await interaction.client.users
+                        .fetch(liste[i].id)
+                        .catch(() => null);
 
-                const isim = uye
-                    ? uye.username
-                    : `Bilinmeyen Kullanıcı`;
+                const isim =
+                    uye
+                        ? uye.username
+                        : "Bilinmeyen Kullanıcı";
+
+                const madalya =
+                    i === 0
+                        ? "🥇"
+                        : i === 1
+                            ? "🥈"
+                            : i === 2
+                                ? "🥉"
+                                : `**${i + 1}.**`;
 
                 metin +=
-                    `**${i + 1}.** ${isim} — **${paraFormatla(liste[i].toplam)} para**\n`;
+                    `${madalya} ${isim}\n` +
+                    `└─ 💎 **${paraFormatla(liste[i].toplam)}** para\n\n`;
             }
 
+            const embed = embedBaslik(
+                "🏆 Ekonomi • En Zenginler",
+                `Sunucunun en yüksek toplam servete sahip kullanıcıları.`
+            );
+
+            embed.addFields({
+                name: "💎 Servet Sıralaması",
+                value: metin
+            });
+
+            embed.setFooter({
+                text:
+                    `${interaction.guild.name} • İlk 10`
+            });
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "🏆 En Zenginler",
-                        metin
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -989,47 +1562,124 @@ async function execute(interaction) {
 
         if (komut === "envanter") {
 
-            const uye = interaction.options.getUser("uye") || interaction.user;
+            const uye =
+                interaction.options.getUser("uye") ||
+                interaction.user;
 
             const hedef =
-                hesapOlustur(data, guildId, uye.id);
-
-            verileriKaydet(data);
+                hesapOlustur(
+                    data,
+                    guildId,
+                    uye.id
+                );
 
             const esyalar =
-                Object.entries(hedef.envanter)
-                    .filter(([, miktar]) => Number(miktar) > 0);
+                Object.entries(
+                    hedef.envanter
+                )
+                    .filter(
+                        ([, miktar]) =>
+                            Number(miktar) > 0
+                    );
 
             if (esyalar.length === 0) {
+
+                const embed =
+                    embedBaslik(
+                        "🎒 Envanter",
+                        `**${uye.username}** adlı kullanıcının envanteri boş.`
+                    );
+
+                embed.setThumbnail(
+                    uye.displayAvatarURL()
+                );
+
                 return interaction.reply({
-                    embeds: [
-                        embedBaslik(
-                            "🎒 Envanter",
-                            `**${uye.username}** adlı kullanıcının envanteri boş.`
-                        )
-                    ]
+                    embeds: [embed]
                 });
             }
 
             let metin = "";
+            let toplamEsya = 0;
+            let toplamDeger = 0;
 
-            for (const [anahtar, miktar] of esyalar) {
+            for (
+                const [anahtar, miktar]
+                of esyalar
+            ) {
 
-                const item = market[anahtar];
+                const item =
+                    market[anahtar];
 
                 if (!item) continue;
 
+                const adet =
+                    Number(miktar);
+
+                toplamEsya += adet;
+                toplamDeger +=
+                    item.fiyat * adet;
+
                 metin +=
-                    `**${item.isim}** × ${miktar}\n`;
+                    `${item.emoji} **${item.isim}** × **${adet}**\n` +
+                    `└─ Birim değer: ${paraFormatla(item.fiyat)}\n` +
+                    `└─ Tahmini satış: ${paraFormatla(item.satis * adet)}\n\n`;
             }
 
+            const embed = embedBaslik(
+                `🎒 ${uye.username} • Envanter`,
+                `Sahip olunan eşyaların detaylı listesi.`
+            );
+
+            embed.setThumbnail(
+                uye.displayAvatarURL()
+            );
+
+            embed.addFields(
+                {
+                    name: "📦 Eşyalar",
+                    value:
+                        metin,
+                    inline: false
+                },
+                {
+                    name: "🔢 Toplam Adet",
+                    value:
+                        `**${paraFormatla(toplamEsya)}**`,
+                    inline: true
+                },
+                {
+                    name: "💎 Alış Değeri",
+                    value:
+                        `**${paraFormatla(toplamDeger)}**`,
+                    inline: true
+                },
+                {
+                    name: "💰 Tahmini Satış Değeri",
+                    value:
+                        `**${paraFormatla(
+                            esyalar.reduce(
+                                (toplam, [anahtar, miktar]) => {
+                                    const item =
+                                        market[anahtar];
+
+                                    return (
+                                        toplam +
+                                        (
+                                            item?.satis || 0
+                                        ) *
+                                        Number(miktar)
+                                    );
+                                },
+                                0
+                            )
+                        )}**`,
+                    inline: true
+                }
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        `🎒 ${uye.username} • Envanter`,
-                        metin || "Envanter boş."
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -1041,18 +1691,39 @@ async function execute(interaction) {
 
             let metin = "";
 
-            for (const item of Object.values(market)) {
+            for (
+                const [anahtar, item]
+                of Object.entries(market)
+            ) {
+
+                const kar =
+                    item.fiyat - item.satis;
+
                 metin +=
-                    `**${item.isim}** — ${paraFormatla(item.fiyat)} para\n`;
+                    `${item.emoji} **${item.isim}**\n` +
+                    `└─ 💰 Alış: **${paraFormatla(item.fiyat)}**\n` +
+                    `└─ 💵 Satış: **${paraFormatla(item.satis)}**\n` +
+                    `└─ 📦 ${item.kategori}\n` +
+                    `└─ 📝 ${item.aciklama}\n\n`;
             }
 
+            const embed = embedBaslik(
+                "🛒 Ekonomi Marketi",
+                `Ekonomi marketindeki mevcut ürünler.`
+            );
+
+            embed.addFields({
+                name: "🏪 Ürünler",
+                value: metin
+            });
+
+            embed.setFooter({
+                text:
+                    "Satış fiyatları alış fiyatının %60'ıdır."
+            });
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "🛒 Ekonomi Marketi",
-                        metin
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -1062,10 +1733,14 @@ async function execute(interaction) {
 
         if (komut === "satinal") {
 
-            const esya = interaction.options.getString("esya");
-            const miktar = interaction.options.getInteger("miktar");
+            const esya =
+                interaction.options.getString("esya");
 
-            const item = market[esya];
+            const miktar =
+                interaction.options.getInteger("miktar");
+
+            const item =
+                market[esya];
 
             if (!item) {
                 return interaction.reply({
@@ -1074,12 +1749,31 @@ async function execute(interaction) {
                 });
             }
 
-            const toplam = item.fiyat * miktar;
+            const toplam =
+                item.fiyat * miktar;
+
+            if (!Number.isSafeInteger(toplam)) {
+                return interaction.reply({
+                    content: "❌ Geçersiz toplam fiyat.",
+                    ephemeral: true
+                });
+            }
 
             if (hesap.para < toplam) {
+
+                const eksik =
+                    toplam - hesap.para;
+
                 return interaction.reply({
-                    content:
-                        `❌ Yeterli paran yok.\n\nGereken: **${paraFormatla(toplam)} para**`,
+                    embeds: [
+                        embedBaslik(
+                            "❌ Yetersiz Bakiye",
+                            `Bu alışveriş için yeterli paran bulunmuyor.\n\n` +
+                            `💰 Gereken: **${paraFormatla(toplam)}**\n` +
+                            `💵 Mevcut: **${paraFormatla(hesap.para)}**\n` +
+                            `📉 Eksik: **${paraFormatla(eksik)}**`
+                        )
+                    ],
                     ephemeral: true
                 });
             }
@@ -1088,19 +1782,60 @@ async function execute(interaction) {
             hesap.toplamHarcanan += toplam;
 
             hesap.envanter[esya] =
-                Number(hesap.envanter[esya] || 0) + miktar;
+                Number(
+                    hesap.envanter[esya] || 0
+                ) + miktar;
 
             hesap.gorevler.market += miktar;
+            hesap.istatistik.satinAlma += miktar;
 
             verileriKaydet(data);
 
+            const embed = embedBaslik(
+                "🛒 Satın Alma Başarılı",
+                `${item.emoji} **${item.isim}** envanterine eklendi.`
+            );
+
+            embed.addFields(
+                {
+                    name: "📦 Ürün",
+                    value:
+                        `**${miktar}x ${item.isim}**`,
+                    inline: true
+                },
+                {
+                    name: "💸 Harcanan",
+                    value:
+                        `**${paraFormatla(toplam)}**`,
+                    inline: true
+                },
+                {
+                    name: "💵 Kalan Bakiye",
+                    value:
+                        `**${paraFormatla(hesap.para)}**`,
+                    inline: true
+                },
+                {
+                    name: "🎒 Envanterindeki Miktar",
+                    value:
+                        `**${paraFormatla(
+                            hesap.envanter[esya]
+                        )}x**`,
+                    inline: false
+                },
+                {
+                    name: "📋 Market Görevi",
+                    value:
+                        gorevDurumu(
+                            hesap.gorevler.market,
+                            5
+                        ),
+                    inline: false
+                }
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "🛒 Satın Alma",
-                        `**${miktar}x ${item.isim}** satın aldın.\n\n💸 Harcanan: **${paraFormatla(toplam)} para**\n💵 Kalan: **${paraFormatla(hesap.para)} para**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -1110,10 +1845,14 @@ async function execute(interaction) {
 
         if (komut === "sat") {
 
-            const esya = interaction.options.getString("esya");
-            const miktar = interaction.options.getInteger("miktar");
+            const esya =
+                interaction.options.getString("esya");
 
-            const item = market[esya];
+            const miktar =
+                interaction.options.getInteger("miktar");
+
+            const item =
+                market[esya];
 
             if (!item) {
                 return interaction.reply({
@@ -1123,32 +1862,83 @@ async function execute(interaction) {
             }
 
             const sahip =
-                Number(hesap.envanter[esya] || 0);
+                Number(
+                    hesap.envanter[esya] || 0
+                );
 
             if (sahip < miktar) {
                 return interaction.reply({
-                    content:
-                        `❌ Envanterinde yeterli **${item.isim}** yok.`,
+                    embeds: [
+                        embedBaslik(
+                            "❌ Yetersiz Eşya",
+                            `Envanterinde yeterli **${item.isim}** bulunmuyor.\n\n` +
+                            `🎒 Sahip olduğun: **${sahip}**\n` +
+                            `📦 İstenen: **${miktar}**`
+                        )
+                    ],
                     ephemeral: true
                 });
             }
 
             const kazanc =
-                Math.floor(item.fiyat * 0.60) * miktar;
+                item.satis * miktar;
 
             hesap.envanter[esya] -= miktar;
+
+            if (hesap.envanter[esya] <= 0) {
+                delete hesap.envanter[esya];
+            }
+
             hesap.para += kazanc;
             hesap.toplamKazanilan += kazanc;
+            hesap.istatistik.satis += miktar;
 
             verileriKaydet(data);
 
+            const embed = embedBaslik(
+                "💰 Eşya Satıldı",
+                `${item.emoji} Eşyan başarıyla satıldı.`
+            );
+
+            embed.addFields(
+                {
+                    name: "📦 Satılan",
+                    value:
+                        `**${miktar}x ${item.isim}**`,
+                    inline: true
+                },
+                {
+                    name: "💰 Kazanç",
+                    value:
+                        `**+${paraFormatla(kazanc)}**`,
+                    inline: true
+                },
+                {
+                    name: "💵 Yeni Bakiye",
+                    value:
+                        `**${paraFormatla(hesap.para)}**`,
+                    inline: true
+                },
+                {
+                    name: "📊 Birim Satış Fiyatı",
+                    value:
+                        `**${paraFormatla(item.satis)}**`,
+                    inline: true
+                },
+                {
+                    name: "🎒 Kalan Miktar",
+                    value:
+                        `**${paraFormatla(
+                            Number(
+                                hesap.envanter[esya] || 0
+                            )
+                        )}x**`,
+                    inline: true
+                }
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "💰 Eşya Satıldı",
-                        `**${miktar}x ${item.isim}** sattın.\n\n💵 Kazanç: **${paraFormatla(kazanc)} para**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -1158,13 +1948,79 @@ async function execute(interaction) {
 
         if (komut === "banka") {
 
+            const toplam =
+                hesap.para +
+                hesap.banka;
+
+            const oran =
+                Math.min(
+                    100,
+                    (hesap.banka / BANKA_LIMITI) * 100
+                );
+
+            const faizTahmini =
+                Math.floor(
+                    hesap.banka *
+                    FAIZ_ORANI
+                );
+
+            const embed = embedBaslik(
+                "🏦 Banka • Finans Merkezi",
+                `Banka hesabının detaylı finansal durumu.`
+            );
+
+            embed.addFields(
+                {
+                    name: "💵 Cüzdan",
+                    value:
+                        `**${paraFormatla(hesap.para)}**`,
+                    inline: true
+                },
+                {
+                    name: "🏦 Banka",
+                    value:
+                        `**${paraFormatla(hesap.banka)}**`,
+                    inline: true
+                },
+                {
+                    name: "💎 Toplam Servet",
+                    value:
+                        `**${paraFormatla(toplam)}**`,
+                    inline: true
+                },
+                {
+                    name: "📈 Mevcut Faiz",
+                    value:
+                        `**%${FAIZ_ORANI * 100}**`,
+                    inline: true
+                },
+                {
+                    name: "💰 Tahmini Faiz",
+                    value:
+                        `**+${paraFormatla(faizTahmini)}**`,
+                    inline: true
+                },
+                {
+                    name: "🔒 Banka Limiti",
+                    value:
+                        `**${paraFormatla(BANKA_LIMITI)}**`,
+                    inline: true
+                },
+                {
+                    name: "📊 Limit Kullanımı",
+                    value:
+                        `${ilerlemeCubugu(
+                            hesap.banka,
+                            BANKA_LIMITI,
+                            14
+                        )}\n` +
+                        `**${yuzdeFormatla(oran)}** kullanılıyor`,
+                    inline: false
+                }
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "🏦 Banka",
-                        `💵 Cüzdan: **${paraFormatla(hesap.para)} para**\n🏦 Banka: **${paraFormatla(hesap.banka)} para**\n\n📊 Banka limiti: **1.000.000 para**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -1179,14 +2035,22 @@ async function execute(interaction) {
 
             if (hesap.para < miktar) {
                 return interaction.reply({
-                    content: "❌ Cüzdanında yeterli para yok.",
+                    content:
+                        `❌ Cüzdanında yeterli para yok.\n\n` +
+                        `Cüzdan: **${paraFormatla(hesap.para)}**\n` +
+                        `Gereken: **${paraFormatla(miktar)}**`,
                     ephemeral: true
                 });
             }
 
-            if (hesap.banka + miktar > 1000000) {
+            if (
+                hesap.banka + miktar >
+                BANKA_LIMITI
+            ) {
                 return interaction.reply({
-                    content: "❌ Banka limiti 1.000.000 paradır.",
+                    content:
+                        `❌ Banka limitini aşamazsın.\n\n` +
+                        `Limit: **${paraFormatla(BANKA_LIMITI)}**`,
                     ephemeral: true
                 });
             }
@@ -1196,13 +2060,34 @@ async function execute(interaction) {
 
             verileriKaydet(data);
 
+            const embed = embedBaslik(
+                "🏦 Para Yatırıldı",
+                `Para başarıyla banka hesabına aktarıldı.`
+            );
+
+            embed.addFields(
+                {
+                    name: "💸 Yatırılan",
+                    value:
+                        `**${paraFormatla(miktar)}**`,
+                    inline: true
+                },
+                {
+                    name: "💵 Cüzdan",
+                    value:
+                        `**${paraFormatla(hesap.para)}**`,
+                    inline: true
+                },
+                {
+                    name: "🏦 Yeni Banka",
+                    value:
+                        `**${paraFormatla(hesap.banka)}**`,
+                    inline: true
+                }
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "🏦 Para Yatırıldı",
-                        `**${paraFormatla(miktar)} para** bankaya yatırıldı.\n\n🏦 Banka: **${paraFormatla(hesap.banka)} para**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -1217,7 +2102,10 @@ async function execute(interaction) {
 
             if (hesap.banka < miktar) {
                 return interaction.reply({
-                    content: "❌ Bankanda yeterli para yok.",
+                    content:
+                        `❌ Bankanda yeterli para yok.\n\n` +
+                        `Banka: **${paraFormatla(hesap.banka)}**\n` +
+                        `Gereken: **${paraFormatla(miktar)}**`,
                     ephemeral: true
                 });
             }
@@ -1227,13 +2115,34 @@ async function execute(interaction) {
 
             verileriKaydet(data);
 
+            const embed = embedBaslik(
+                "🏦 Para Çekildi",
+                `Para banka hesabından cüzdanına aktarıldı.`
+            );
+
+            embed.addFields(
+                {
+                    name: "💸 Çekilen",
+                    value:
+                        `**${paraFormatla(miktar)}**`,
+                    inline: true
+                },
+                {
+                    name: "🏦 Kalan Banka",
+                    value:
+                        `**${paraFormatla(hesap.banka)}**`,
+                    inline: true
+                },
+                {
+                    name: "💵 Yeni Cüzdan",
+                    value:
+                        `**${paraFormatla(hesap.para)}**`,
+                    inline: true
+                }
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "🏦 Para Çekildi",
-                        `Bankadan **${paraFormatla(miktar)} para** çektin.\n\n💵 Cüzdan: **${paraFormatla(hesap.para)} para**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -1243,51 +2152,102 @@ async function execute(interaction) {
 
         if (komut === "faiz") {
 
-            const simdi = Date.now();
+            const kalan =
+                cooldownKalan(
+                    hesap.sonFaiz,
+                    FAIZ_COOLDOWN
+                );
 
-            if (
-                hesap.sonFaiz &&
-                simdi - hesap.sonFaiz < 24 * 60 * 60 * 1000
-            ) {
-                const kalan =
-                    24 * 60 * 60 * 1000 -
-                    (simdi - hesap.sonFaiz);
-
-                const saat =
-                    Math.floor(kalan / 3600000);
+            if (kalan > 0) {
 
                 return interaction.reply({
-                    content:
-                        `⏳ Faizi tekrar almak için yaklaşık **${saat} saat** beklemelisin.`,
+                    embeds: [
+                        embedBaslik(
+                            "⏳ Faiz Hazır Değil",
+                            `Bir sonraki faiz ödemesini almak için ` +
+                            `**${kalanSure(kalan)}** beklemelisin.`
+                        )
+                    ],
                     ephemeral: true
                 });
             }
 
             if (hesap.banka <= 0) {
                 return interaction.reply({
-                    content: "❌ Bankanda faiz kazanacak para yok.",
+                    content:
+                        "❌ Bankanda faiz kazanacak para bulunmuyor.",
                     ephemeral: true
                 });
             }
 
             const faiz =
-                Math.floor(hesap.banka * 0.02);
+                Math.floor(
+                    hesap.banka *
+                    FAIZ_ORANI
+                );
+
+            if (faiz <= 0) {
+                return interaction.reply({
+                    content:
+                        "❌ Banka bakiyen faiz kazanmak için çok düşük.",
+                    ephemeral: true
+                });
+            }
+
+            const eskiBanka =
+                hesap.banka;
 
             hesap.banka =
-                Math.min(1000000, hesap.banka + faiz);
+                Math.min(
+                    BANKA_LIMITI,
+                    hesap.banka + faiz
+                );
 
-            hesap.toplamKazanilan += faiz;
-            hesap.sonFaiz = simdi;
+            const gercekFaiz =
+                hesap.banka - eskiBanka;
+
+            hesap.toplamKazanilan +=
+                gercekFaiz;
+
+            hesap.sonFaiz = Date.now();
+            hesap.istatistik.faiz++;
 
             verileriKaydet(data);
 
+            const embed = embedBaslik(
+                "📈 Banka Faizi",
+                `Banka hesabına günlük faiz işlendi.`
+            );
+
+            embed.addFields(
+                {
+                    name: "🏦 Önceki Bakiye",
+                    value:
+                        `**${paraFormatla(eskiBanka)}**`,
+                    inline: true
+                },
+                {
+                    name: "📈 Faiz Oranı",
+                    value:
+                        `**%${FAIZ_ORANI * 100}**`,
+                    inline: true
+                },
+                {
+                    name: "💰 Kazanç",
+                    value:
+                        `**+${paraFormatla(gercekFaiz)}**`,
+                    inline: true
+                },
+                {
+                    name: "🏦 Yeni Bakiye",
+                    value:
+                        `**${paraFormatla(hesap.banka)}**`,
+                    inline: false
+                }
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "📈 Banka Faizi",
-                        `Bankandan **%2 faiz** kazandın.\n\n💰 Faiz: **${paraFormatla(faiz)} para**\n🏦 Yeni banka bakiyesi: **${paraFormatla(hesap.banka)} para**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -1297,13 +2257,57 @@ async function execute(interaction) {
 
         if (komut === "kasa") {
 
+            const embed = embedBaslik(
+                "🎁 Kasa Sistemi",
+                `Ekonomi kasalarını kullanarak rastgele para ödülleri kazanabilirsin.`
+            );
+
+            embed.addFields(
+                {
+                    name: "🎁 Sahip Olduğun Kasa",
+                    value:
+                        `**${paraFormatla(hesap.kasa)}**`,
+                    inline: true
+                },
+                {
+                    name: "💰 Kasa Fiyatı",
+                    value:
+                        `**${paraFormatla(KASA_FIYAT)}**`,
+                    inline: true
+                },
+                {
+                    name: "🎉 Ödül Aralığı",
+                    value:
+                        `**${paraFormatla(KASA_MIN)}** - ` +
+                        `**${paraFormatla(KASA_MAX)}**`,
+                    inline: true
+                },
+                {
+                    name: "📊 Beklenen Değer",
+                    value:
+                        `Yaklaşık **${paraFormatla(
+                            (KASA_MIN + KASA_MAX) / 2
+                        )}**`,
+                    inline: true
+                },
+                {
+                    name: "💵 Cüzdan",
+                    value:
+                        `**${paraFormatla(hesap.para)}**`,
+                    inline: true
+                },
+                {
+                    name: "🔓 Durum",
+                    value:
+                        hesap.para >= KASA_FIYAT
+                            ? "✅ Kasa açmaya hazırsın."
+                            : "❌ Kasa açmak için paran yetersiz.",
+                    inline: true
+                }
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "🎁 Kasa",
-                        `Sahip olduğun kasa: **${hesap.kasa}**\n\n📦 Kasa açma ücreti: **5.000 para**\n🎁 Ödül aralığı: **1.000 - 10.000 para**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -1313,36 +2317,77 @@ async function execute(interaction) {
 
         if (komut === "kasa-ac") {
 
-            const fiyat = 5000;
-
-            if (hesap.para < fiyat) {
+            if (hesap.para < KASA_FIYAT) {
                 return interaction.reply({
                     content:
-                        `❌ Kasa açmak için **${paraFormatla(fiyat)} para** gerekiyor.`,
+                        `❌ Kasa açmak için **${paraFormatla(KASA_FIYAT)}** para gerekiyor.`,
                     ephemeral: true
                 });
             }
 
             const odul =
-                Math.floor(Math.random() * 9001) + 1000;
+                Math.floor(
+                    Math.random() *
+                    (
+                        KASA_MAX -
+                        KASA_MIN +
+                        1
+                    )
+                ) +
+                KASA_MIN;
 
-            hesap.para -= fiyat;
-            hesap.toplamHarcanan += fiyat;
+            hesap.para -= KASA_FIYAT;
+            hesap.toplamHarcanan +=
+                KASA_FIYAT;
 
             hesap.para += odul;
-            hesap.toplamKazanilan += odul;
+            hesap.toplamKazanilan +=
+                odul;
 
             hesap.sonKasa = Date.now();
+            hesap.istatistik.kasa++;
+
+            const net =
+                odul - KASA_FIYAT;
 
             verileriKaydet(data);
 
+            const embed = embedBaslik(
+                "🎁 Kasa Açıldı!",
+                `Kasanı açtın ve içinden rastgele bir para ödülü çıktı.`
+            );
+
+            embed.addFields(
+                {
+                    name: "📦 Kasa Maliyeti",
+                    value:
+                        `**-${paraFormatla(KASA_FIYAT)}**`,
+                    inline: true
+                },
+                {
+                    name: "🎉 Kasa Ödülü",
+                    value:
+                        `**+${paraFormatla(odul)}**`,
+                    inline: true
+                },
+                {
+                    name: "📊 Net Sonuç",
+                    value:
+                        net >= 0
+                            ? `🟢 **+${paraFormatla(net)}**`
+                            : `🔴 **${paraFormatla(net)}**`,
+                    inline: true
+                },
+                {
+                    name: "💵 Yeni Bakiye",
+                    value:
+                        `**${paraFormatla(hesap.para)}**`,
+                    inline: false
+                }
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "🎁 Kasa Açıldı!",
-                        `Kasa için **${paraFormatla(fiyat)} para** harcadın.\n\n🎉 Kazandığın ödül: **${paraFormatla(odul)} para**\n\n💵 Yeni bakiye: **${paraFormatla(hesap.para)} para**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -1357,76 +2402,58 @@ async function execute(interaction) {
 
             if (!hedefUser) {
                 return interaction.reply({
-                    content: "❌ Hedef kullanıcı bulunamadı.",
+                    content:
+                        "❌ Hedef kullanıcı bulunamadı.",
                     ephemeral: true
                 });
             }
 
             if (hedefUser.id === userId) {
                 return interaction.reply({
-                    content: "❌ Kendini soyamazsın.",
+                    content:
+                        "❌ Kendini soyamazsın.",
                     ephemeral: true
                 });
             }
 
             if (hedefUser.bot) {
                 return interaction.reply({
-                    content: "❌ Botları soyamazsın.",
+                    content:
+                        "❌ Botları soyamazsın.",
                     ephemeral: true
                 });
             }
 
-            const simdi = Date.now();
+            const kalan =
+                cooldownKalan(
+                    hesap.sonSoygun,
+                    SOYGUN_COOLDOWN
+                );
 
-            if (
-                hesap.sonSoygun &&
-                simdi - hesap.sonSoygun < 30 * 60 * 1000
-            ) {
-
-                const kalan =
-                    30 * 60 * 1000 -
-                    (simdi - hesap.sonSoygun);
-
-                const dakika =
-                    Math.ceil(kalan / 60000);
-
+            if (kalan > 0) {
                 return interaction.reply({
-                    content:
-                        `⏳ Tekrar soygun yapabilmek için **${dakika} dakika** beklemelisin.`,
+                    embeds: [
+                        embedBaslik(
+                            "⏳ Soygun Bekleme Süresi",
+                            `Bir sonraki soygun için ` +
+                            `**${kalanSure(kalan)}** beklemelisin.`
+                        )
+                    ],
                     ephemeral: true
                 });
             }
 
             const hedef =
-                hesapOlustur(data, guildId, hedefUser.id);
+                hesapOlustur(
+                    data,
+                    guildId,
+                    hedefUser.id
+                );
 
-            hesap.sonSoygun = simdi;
+            hesap.sonSoygun =
+                Date.now();
 
-            const basarili =
-                Math.random() < 0.40;
-
-            if (!basarili) {
-
-                const ceza =
-                    Math.min(
-                        hesap.para,
-                        Math.floor(Math.random() * 401) + 100
-                    );
-
-                hesap.para -= ceza;
-                hesap.toplamHarcanan += ceza;
-
-                verileriKaydet(data);
-
-                return interaction.reply({
-                    embeds: [
-                        embedBaslik(
-                            "🚨 Soygun Başarısız",
-                            `Soygun girişimin başarısız oldu.\n\n💸 Kayıp: **${paraFormatla(ceza)} para**`
-                        )
-                    ]
-                });
-            }
+            hesap.istatistik.soygun++;
 
             if (hedef.para <= 0) {
 
@@ -1436,7 +2463,59 @@ async function execute(interaction) {
                     embeds: [
                         embedBaslik(
                             "💰 Soygun",
-                            `**${hedefUser.username}** kullanıcısının cüzdanında çalınabilecek para yok.`
+                            `**${hedefUser.username}** kullanıcısının ` +
+                            `cüzdanında çalınabilecek para bulunmuyor.`
+                        )
+                    ]
+                });
+            }
+
+            const basarili =
+                Math.random() < 0.40;
+
+            if (!basarili) {
+
+                const ceza =
+                    Math.min(
+                        hesap.para,
+                        Math.floor(
+                            Math.random() *
+                            401
+                        ) + 100
+                    );
+
+                hesap.para -= ceza;
+                hesap.toplamHarcanan +=
+                    ceza;
+
+                hesap.istatistik.basarisizSoygun++;
+
+                verileriKaydet(data);
+
+                return interaction.reply({
+                    embeds: [
+                        embedBaslik(
+                            "🚨 Soygun Başarısız",
+                            `Soygun girişimin başarısız oldu ve yakalandın.`
+                        ).addFields(
+                            {
+                                name: "💸 Kayıp",
+                                value:
+                                    `**-${paraFormatla(ceza)}**`,
+                                inline: true
+                            },
+                            {
+                                name: "💵 Yeni Bakiye",
+                                value:
+                                    `**${paraFormatla(hesap.para)}**`,
+                                inline: true
+                            },
+                            {
+                                name: "📊 Başarı Şansı",
+                                value:
+                                    "**%40**",
+                                inline: true
+                            }
                         )
                     ]
                 });
@@ -1445,13 +2524,26 @@ async function execute(interaction) {
             const miktar =
                 Math.min(
                     hedef.para,
-                    Math.floor(Math.random() * 9001) + 1000
+                    Math.floor(
+                        Math.random() *
+                        9001
+                    ) + 1000
                 );
 
             hedef.para -= miktar;
             hesap.para += miktar;
 
-            hesap.toplamKazanilan += miktar;
+            hesap.toplamKazanilan +=
+                miktar;
+
+            hesap.istatistik.basari =
+                Number(
+                    hesap.istatistik.basari || 0
+                );
+
+            hesap.istatistik.basari++;
+
+            hesap.istatistik.basariliSoygun++;
 
             verileriKaydet(data);
 
@@ -1459,7 +2551,40 @@ async function execute(interaction) {
                 embeds: [
                     embedBaslik(
                         "💰 Soygun Başarılı!",
-                        `**${hedefUser.username}** kullanıcısından **${paraFormatla(miktar)} para** kazandın.`
+                        `Soygun başarıyla tamamlandı.`
+                    ).addFields(
+                        {
+                            name: "🎯 Hedef",
+                            value:
+                                `${hedefUser}`,
+                            inline: true
+                        },
+                        {
+                            name: "💰 Çalınan",
+                            value:
+                                `**+${paraFormatla(miktar)}**`,
+                            inline: true
+                        },
+                        {
+                            name: "💵 Yeni Bakiye",
+                            value:
+                                `**${paraFormatla(hesap.para)}**`,
+                            inline: true
+                        },
+                        {
+                            name: "🎲 Başarı Şansı",
+                            value:
+                                "**%40**",
+                            inline: true
+                        },
+                        {
+                            name: "📊 Başarılı Soygun",
+                            value:
+                                `**${paraFormatla(
+                                    hesap.istatistik.basariliSoygun
+                                )}**`,
+                            inline: true
+                        }
                     )
                 ]
             });
@@ -1472,37 +2597,77 @@ async function execute(interaction) {
         if (komut === "gorevler") {
 
             const calisma =
-                Math.min(hesap.gorevler.calisma, 5);
+                Math.min(
+                    hesap.gorevler.calisma,
+                    5
+                );
 
             const transfer =
-                Math.min(hesap.gorevler.transfer, 3);
+                Math.min(
+                    hesap.gorevler.transfer,
+                    3
+                );
 
             const marketSayisi =
-                Math.min(hesap.gorevler.market, 5);
+                Math.min(
+                    hesap.gorevler.market,
+                    5
+                );
+
+            const tamamlanan = [
+                calisma >= 5,
+                transfer >= 3,
+                marketSayisi >= 5
+            ].filter(Boolean).length;
+
+            const toplamOdul =
+                2000 + 1500 + 1000;
 
             const embed = embedBaslik(
                 "📋 Günlük Görevler",
-                "Bugünkü görevlerin:"
+                `Bugünkü görevlerini tamamlayarak toplam **${paraFormatla(toplamOdul)}** para kazanabilirsin.`
             );
 
             embed.addFields(
                 {
                     name: "💼 Çalış",
                     value:
-                        `${calisma}/5\nÖdül: **2.000 para**`,
+                        `${gorevDurumu(calisma, 5)}\n` +
+                        `🎁 Ödül: **2.000 para**`,
                     inline: true
                 },
                 {
                     name: "💸 Transfer",
                     value:
-                        `${transfer}/3\nÖdül: **1.500 para**`,
+                        `${gorevDurumu(transfer, 3)}\n` +
+                        `🎁 Ödül: **1.500 para**`,
                     inline: true
                 },
                 {
                     name: "🛒 Market",
                     value:
-                        `${marketSayisi}/5\nÖdül: **1.000 para**`,
+                        `${gorevDurumu(marketSayisi, 5)}\n` +
+                        `🎁 Ödül: **1.000 para**`,
                     inline: true
+                },
+                {
+                    name: "📊 Günlük İlerleme",
+                    value:
+                        `**${tamamlanan}/3** görev tamamlandı.\n\n` +
+                        `${ilerlemeCubugu(
+                            tamamlanan,
+                            3,
+                            12
+                        )}`,
+                    inline: false
+                },
+                {
+                    name: "🎁 Ödül Durumu",
+                    value:
+                        tamamlanan === 3
+                            ? "🔥 Tüm görevler tamamlandı! `/ekonomi gorev` kullanabilirsin."
+                            : "Görevlerini tamamlamaya devam et.",
+                    inline: false
                 }
             );
 
@@ -1518,18 +2683,20 @@ async function execute(interaction) {
         if (komut === "gorev") {
 
             let odul = 0;
-            let mesaj = [];
+            const mesaj = [];
 
             if (
                 hesap.gorevler.calisma >= 5 &&
                 !hesap.gorevOdulleri.calisma
             ) {
 
-                hesap.gorevOdulleri.calisma = true;
+                hesap.gorevOdulleri.calisma =
+                    true;
+
                 odul += 2000;
 
                 mesaj.push(
-                    "💼 Çalış görevi: **+2.000**"
+                    "💼 Çalış görevi → **+2.000**"
                 );
             }
 
@@ -1538,11 +2705,13 @@ async function execute(interaction) {
                 !hesap.gorevOdulleri.transfer
             ) {
 
-                hesap.gorevOdulleri.transfer = true;
+                hesap.gorevOdulleri.transfer =
+                    true;
+
                 odul += 1500;
 
                 mesaj.push(
-                    "💸 Transfer görevi: **+1.500**"
+                    "💸 Transfer görevi → **+1.500**"
                 );
             }
 
@@ -1551,34 +2720,63 @@ async function execute(interaction) {
                 !hesap.gorevOdulleri.market
             ) {
 
-                hesap.gorevOdulleri.market = true;
+                hesap.gorevOdulleri.market =
+                    true;
+
                 odul += 1000;
 
                 mesaj.push(
-                    "🛒 Market görevi: **+1.000**"
+                    "🛒 Market görevi → **+1.000**"
                 );
             }
 
             if (odul <= 0) {
+
                 return interaction.reply({
-                    content:
-                        "❌ Şu anda alınabilecek tamamlanmış bir görev ödülün yok.",
+                    embeds: [
+                        embedBaslik(
+                            "📋 Görev Ödülü",
+                            "Şu anda alınabilecek tamamlanmış bir görev ödülün bulunmuyor."
+                        )
+                    ],
                     ephemeral: true
                 });
             }
 
             hesap.para += odul;
-            hesap.toplamKazanilan += odul;
+            hesap.toplamKazanilan +=
+                odul;
 
             verileriKaydet(data);
 
+            const embed = embedBaslik(
+                "🎁 Görev Ödülleri",
+                `Tamamladığın görevlerin ödülleri hesabına aktarıldı.`
+            );
+
+            embed.addFields(
+                {
+                    name: "🏆 Kazanılan Ödüller",
+                    value:
+                        mesaj.join("\n"),
+                    inline: false
+                },
+                {
+                    name: "💰 Toplam Ödül",
+                    value:
+                        `**+${paraFormatla(odul)}**`,
+                    inline: true
+                },
+                {
+                    name: "💵 Yeni Bakiye",
+                    value:
+                        `**${paraFormatla(hesap.para)}**`,
+                    inline: true
+                }
+            );
+
             return interaction.reply({
-                embeds: [
-                    embedBaslik(
-                        "🎁 Görev Ödülleri",
-                        `${mesaj.join("\n")}\n\n💰 Toplam ödül: **${paraFormatla(odul)} para**`
-                    )
-                ]
+                embeds: [embed]
             });
         }
 
@@ -1592,20 +2790,18 @@ async function execute(interaction) {
             "para-al"
         ];
 
-        if (yetkiGerekenler.includes(komut)) {
+        if (
+            yetkiGerekenler.includes(komut) &&
+            !interaction.memberPermissions.has(
+                PermissionFlagsBits.ManageGuild
+            )
+        ) {
 
-            if (
-                !interaction.memberPermissions ||
-                !interaction.memberPermissions.has(
-                    PermissionFlagsBits.ManageGuild
-                )
-            ) {
-                return interaction.reply({
-                    content:
-                        "❌ Bu ekonomi komutu için **Sunucuyu Yönet** yetkisine sahip olmalısın.",
-                    ephemeral: true
-                });
-            }
+            return interaction.reply({
+                content:
+                    "❌ Bu ekonomi komutu için **Sunucuyu Yönet** yetkisine sahip olmalısın.",
+                ephemeral: true
+            });
         }
 
         // =================================================
@@ -1617,10 +2813,23 @@ async function execute(interaction) {
             const uye =
                 interaction.options.getUser("uye");
 
-            const hedef =
-                hesapOlustur(data, guildId, uye.id);
+            if (!uye) {
+                return interaction.reply({
+                    content:
+                        "❌ Kullanıcı bulunamadı.",
+                    ephemeral: true
+                });
+            }
 
-            hedef.gorevTarih = bugun();
+            const hedef =
+                hesapOlustur(
+                    data,
+                    guildId,
+                    uye.id
+                );
+
+            hedef.gorevTarih =
+                bugun();
 
             hedef.gorevler = {
                 calisma: 0,
@@ -1640,7 +2849,7 @@ async function execute(interaction) {
                 embeds: [
                     embedBaslik(
                         "🔄 Görevler Sıfırlandı",
-                        `**${uye.username}** kullanıcısının günlük görevleri sıfırlandı.`
+                        `**${uye.username}** kullanıcısının günlük görevleri başarıyla sıfırlandı.`
                     )
                 ]
             });
@@ -1660,16 +2869,22 @@ async function execute(interaction) {
 
             if (uye.bot) {
                 return interaction.reply({
-                    content: "❌ Botlara ekonomi parası veremezsin.",
+                    content:
+                        "❌ Botlara ekonomi parası veremezsin.",
                     ephemeral: true
                 });
             }
 
             const hedef =
-                hesapOlustur(data, guildId, uye.id);
+                hesapOlustur(
+                    data,
+                    guildId,
+                    uye.id
+                );
 
             hedef.para += miktar;
-            hedef.toplamKazanilan += miktar;
+            hedef.toplamKazanilan +=
+                miktar;
 
             verileriKaydet(data);
 
@@ -1677,7 +2892,32 @@ async function execute(interaction) {
                 embeds: [
                     embedBaslik(
                         "💰 Para Verildi",
-                        `**${uye.username}** kullanıcısına **${paraFormatla(miktar)} para** verildi.`
+                        `Yetkili tarafından ekonomi hesabına para eklendi.`
+                    ).addFields(
+                        {
+                            name: "👤 Kullanıcı",
+                            value:
+                                `${uye}`,
+                            inline: true
+                        },
+                        {
+                            name: "💰 Verilen",
+                            value:
+                                `**+${paraFormatla(miktar)}**`,
+                            inline: true
+                        },
+                        {
+                            name: "💵 Yeni Bakiye",
+                            value:
+                                `**${paraFormatla(hedef.para)}**`,
+                            inline: true
+                        },
+                        {
+                            name: "🛡️ İşlem Yetkilisi",
+                            value:
+                                `${interaction.user}`,
+                            inline: false
+                        }
                     )
                 ]
             });
@@ -1696,24 +2936,37 @@ async function execute(interaction) {
                 interaction.options.getInteger("miktar");
 
             const hedef =
-                hesapOlustur(data, guildId, uye.id);
+                hesapOlustur(
+                    data,
+                    guildId,
+                    uye.id
+                );
 
             const alinabilecek =
-                Math.min(hedef.para, miktar);
+                Math.min(
+                    hedef.para,
+                    miktar
+                );
 
             if (alinabilecek <= 0) {
                 return interaction.reply({
                     content:
-                        "❌ Kullanıcının cüzdanında para bulunmuyor.",
+                        "❌ Kullanıcının cüzdanında alınabilecek para bulunmuyor.",
                     ephemeral: true
                 });
             }
 
-            hedef.para -= alinabilecek;
-            hedef.toplamHarcanan += alinabilecek;
+            hedef.para -=
+                alinabilecek;
 
-            hesap.para += alinabilecek;
-            hesap.toplamKazanilan += alinabilecek;
+            hedef.toplamHarcanan +=
+                alinabilecek;
+
+            hesap.para +=
+                alinabilecek;
+
+            hesap.toplamKazanilan +=
+                alinabilecek;
 
             verileriKaydet(data);
 
@@ -1721,39 +2974,81 @@ async function execute(interaction) {
                 embeds: [
                     embedBaslik(
                         "💸 Para Alındı",
-                        `**${uye.username}** kullanıcısından **${paraFormatla(alinabilecek)} para** alındı.`
+                        `Kullanıcının cüzdanından ekonomi parası alındı.`
+                    ).addFields(
+                        {
+                            name: "👤 Kullanıcı",
+                            value:
+                                `${uye}`,
+                            inline: true
+                        },
+                        {
+                            name: "💸 Alınan",
+                            value:
+                                `**${paraFormatla(alinabilecek)}**`,
+                            inline: true
+                        },
+                        {
+                            name: "💰 Yetkili Cüzdanı",
+                            value:
+                                `**${paraFormatla(hesap.para)}**`,
+                            inline: true
+                        },
+                        {
+                            name: "💵 Kullanıcı Cüzdanı",
+                            value:
+                                `**${paraFormatla(hedef.para)}**`,
+                            inline: true
+                        },
+                        {
+                            name: "🛡️ İşlem Yetkilisi",
+                            value:
+                                `${interaction.user}`,
+                            inline: true
+                        }
                     )
                 ]
             });
         }
 
         // =================================================
-        // TANIMSIZ KOMUT
+        // TANIMSIZ
         // =================================================
 
         return interaction.reply({
-            content: "❌ Geçersiz ekonomi alt komutu.",
+            content:
+                "❌ Geçersiz ekonomi alt komutu.",
             ephemeral: true
         });
 
     } catch (error) {
 
-        console.error("❌ Ekonomi komutu hatası:", error);
+        console.error(
+            "❌ Ekonomi komutu hatası:",
+            error
+        );
 
         const mesaj =
             "❌ Ekonomi komutunda beklenmeyen bir hata oluştu.";
 
-        if (interaction.replied || interaction.deferred) {
-            return interaction.followUp({
-                content: mesaj,
-                ephemeral: true
-            }).catch(() => {});
+        if (
+            interaction.replied ||
+            interaction.deferred
+        ) {
+            return interaction
+                .followUp({
+                    content: mesaj,
+                    ephemeral: true
+                })
+                .catch(() => {});
         }
 
-        return interaction.reply({
-            content: mesaj,
-            ephemeral: true
-        }).catch(() => {});
+        return interaction
+            .reply({
+                content: mesaj,
+                ephemeral: true
+            })
+            .catch(() => {});
     }
 }
 
@@ -1765,3 +3060,4 @@ module.exports = {
     data,
     execute
 };
+

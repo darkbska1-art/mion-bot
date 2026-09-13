@@ -1,4 +1,3 @@
-
 const {
     AttachmentBuilder,
     EmbedBuilder
@@ -29,13 +28,17 @@ const imagesFolder = path.join(
     "images"
 );
 
-// HOŞ GELDİN MAKIMA
+// =====================================================
+// MAKIMA GÖRSELLERİ
+// =====================================================
+
+// Oluşturduğumuz Makima görseli
 const welcomeBackground = path.join(
     imagesFolder,
     "makima-welcome.png"
 );
 
-// GÖRÜŞÜRÜZ MAKIMA
+// Görüşürüz görseli
 const goodbyeBackground = path.join(
     imagesFolder,
     "makima-goodbye.png"
@@ -46,14 +49,24 @@ const goodbyeBackground = path.join(
 // =====================================================
 
 function getData() {
+
     try {
+
         if (!fs.existsSync(dataFile)) {
             return {};
         }
 
-        return JSON.parse(
-            fs.readFileSync(dataFile, "utf8")
-        );
+        const raw =
+            fs.readFileSync(
+                dataFile,
+                "utf8"
+            ).trim();
+
+        if (!raw) {
+            return {};
+        }
+
+        return JSON.parse(raw);
 
     } catch (error) {
 
@@ -80,6 +93,16 @@ function getAccountAge(timestamp) {
 
         const years =
             Math.floor(days / 365);
+
+        const remainingMonths =
+            Math.floor(
+                (days % 365) / 30
+            );
+
+        if (remainingMonths > 0) {
+
+            return `${years} yıl ${remainingMonths} ay`;
+        }
 
         return `${years} yıl`;
     }
@@ -249,7 +272,7 @@ function drawCircleImage(
 }
 
 // =====================================================
-// ARKA PLAN
+// MAKIMA ARKA PLAN
 // =====================================================
 
 async function drawBackground(
@@ -261,7 +284,7 @@ async function drawBackground(
 ) {
 
     // =================================================
-    // MAKIMA GÖRSELİ VARSA
+    // MAKIMA GÖRSELİ
     // =================================================
 
     if (
@@ -273,17 +296,127 @@ async function drawBackground(
             const background =
                 await loadImage(file);
 
+            // =============================================
+            // COVER SİSTEMİ
+            // Görsel bozulmaz / ezilmez
+            // =============================================
+
+            const imageRatio =
+                background.width /
+                background.height;
+
+            const canvasRatio =
+                width /
+                height;
+
+            let drawWidth;
+            let drawHeight;
+            let drawX;
+            let drawY;
+
+            if (
+                imageRatio >
+                canvasRatio
+            ) {
+
+                drawHeight =
+                    height;
+
+                drawWidth =
+                    height *
+                    imageRatio;
+
+                drawX =
+                    (width - drawWidth) / 2;
+
+                drawY = 0;
+
+            } else {
+
+                drawWidth =
+                    width;
+
+                drawHeight =
+                    width /
+                    imageRatio;
+
+                drawX = 0;
+
+                drawY =
+                    (height - drawHeight) / 2;
+            }
+
             ctx.drawImage(
                 background,
+                drawX,
+                drawY,
+                drawWidth,
+                drawHeight
+            );
+
+            // =================================================
+            // MAKIMA ÜZERİNE SİNEMATİK KARARTMA
+            // =================================================
+
+            const overlay =
+                ctx.createLinearGradient(
+                    0,
+                    0,
+                    width,
+                    0
+                );
+
+            overlay.addColorStop(
+                0,
+                "rgba(0,0,0,0.05)"
+            );
+
+            overlay.addColorStop(
+                0.45,
+                "rgba(0,0,0,0.18)"
+            );
+
+            overlay.addColorStop(
+                1,
+                "rgba(0,0,0,0.48)"
+            );
+
+            ctx.fillStyle =
+                overlay;
+
+            ctx.fillRect(
                 0,
                 0,
                 width,
                 height
             );
 
-            // Görselin üzerine hafif karartma
+            // =================================================
+            // KIRMIZI VIGNETTE
+            // =================================================
+
+            const vignette =
+                ctx.createRadialGradient(
+                    width / 2,
+                    height / 2,
+                    100,
+                    width / 2,
+                    height / 2,
+                    700
+                );
+
+            vignette.addColorStop(
+                0,
+                "rgba(255,0,0,0)"
+            );
+
+            vignette.addColorStop(
+                1,
+                "rgba(0,0,0,0.40)"
+            );
+
             ctx.fillStyle =
-                "rgba(0,0,0,0.12)";
+                vignette;
 
             ctx.fillRect(
                 0,
@@ -303,7 +436,7 @@ async function drawBackground(
     }
 
     // =================================================
-    // YEDEK KIRMIZI ARKA PLAN
+    // YEDEK ARKA PLAN
     // =================================================
 
     const gradient =
@@ -314,11 +447,13 @@ async function drawBackground(
             height
         );
 
-    if (type === "welcome") {
+    if (
+        type === "welcome"
+    ) {
 
         gradient.addColorStop(
             0,
-            "#250000"
+            "#180000"
         );
 
         gradient.addColorStop(
@@ -328,14 +463,14 @@ async function drawBackground(
 
         gradient.addColorStop(
             1,
-            "#120000"
+            "#050000"
         );
 
     } else {
 
         gradient.addColorStop(
             0,
-            "#100000"
+            "#080000"
         );
 
         gradient.addColorStop(
@@ -345,7 +480,7 @@ async function drawBackground(
 
         gradient.addColorStop(
             1,
-            "#080000"
+            "#020000"
         );
     }
 
@@ -399,7 +534,7 @@ async function createImage(
     );
 
     // =================================================
-    // BİLGİ PANELİ
+    // SAĞ BİLGİ PANELİ
     // =================================================
 
     roundRect(
@@ -412,14 +547,34 @@ async function createImage(
     );
 
     ctx.fillStyle =
-        "rgba(0,0,0,0.70)";
+        "rgba(0,0,0,0.78)";
 
     ctx.fill();
 
     ctx.strokeStyle =
-        "rgba(255,35,35,0.85)";
+        "rgba(255,35,35,0.90)";
 
     ctx.lineWidth = 2;
+
+    ctx.stroke();
+
+    // =================================================
+    // İÇ IŞIK
+    // =================================================
+
+    roundRect(
+        ctx,
+        583,
+        153,
+        544,
+        284,
+        22
+    );
+
+    ctx.strokeStyle =
+        "rgba(255,80,80,0.18)";
+
+    ctx.lineWidth = 1;
 
     ctx.stroke();
 
@@ -438,8 +593,8 @@ async function createImage(
 
     ctx.fillText(
         type === "welcome"
-            ? "WELCOME TO THE SERVER"
-            : "MEMBER LEFT THE SERVER",
+            ? "❤️  HOŞ GELDİN"
+            : "🚪  GÖRÜŞÜRÜZ",
         610,
         180
     );
@@ -472,22 +627,34 @@ async function createImage(
     const avatarY = 300;
     const avatarRadius = 86;
 
-    // Kırmızı avatar glow
+    // =================================================
+    // AVATAR GLOW
+    // =================================================
 
     ctx.beginPath();
 
     ctx.arc(
         avatarX,
         avatarY,
-        avatarRadius + 13,
+        avatarRadius + 16,
         0,
         Math.PI * 2
     );
 
     ctx.fillStyle =
-        "rgba(220,0,0,0.40)";
+        "rgba(220,0,0,0.30)";
 
     ctx.fill();
+
+    ctx.beginPath();
+
+    ctx.arc(
+        avatarX,
+        avatarY,
+        avatarRadius + 9,
+        0,
+        Math.PI * 2
+    );
 
     ctx.strokeStyle =
         "#ff3030";
@@ -496,7 +663,9 @@ async function createImage(
 
     ctx.stroke();
 
-    // Avatar
+    // =================================================
+    // AVATAR
+    // =================================================
 
     if (avatar) {
 
@@ -507,6 +676,23 @@ async function createImage(
             avatarY,
             avatarRadius
         );
+
+    } else {
+
+        ctx.beginPath();
+
+        ctx.arc(
+            avatarX,
+            avatarY,
+            avatarRadius,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle =
+            "#300000";
+
+        ctx.fill();
     }
 
     // =================================================
@@ -570,7 +756,7 @@ async function createImage(
     ctx.fill();
 
     ctx.strokeStyle =
-        "rgba(255,60,60,0.35)";
+        "rgba(255,60,60,0.45)";
 
     ctx.lineWidth = 1;
 
@@ -613,7 +799,9 @@ async function createImage(
     ctx.fill();
 
     ctx.strokeStyle =
-        "rgba(255,60,60,0.35)";
+        "rgba(255,60,60,0.45)";
+
+    ctx.lineWidth = 1;
 
     ctx.stroke();
 
@@ -740,7 +928,7 @@ module.exports = {
                 try {
 
                     // =================================================
-                    // MAKIMA HOŞ GELDİN GÖRSELİ
+                    // MAKIMA GÖRSELİ
                     // =================================================
 
                     const image =
@@ -831,7 +1019,7 @@ module.exports = {
                     });
 
                     console.log(
-                        `✓ Hoş geldin: ${member.user.tag} → ${member.guild.name}`
+                        `✓ Makima hoş geldin: ${member.user.tag} → ${member.guild.name}`
                     );
 
                 } catch (error) {
@@ -974,7 +1162,7 @@ module.exports = {
                     });
 
                     console.log(
-                        `✓ Görüşürüz: ${member.user.tag} → ${member.guild.name}`
+                        `✓ Makima görüşürüz: ${member.user.tag} → ${member.guild.name}`
                     );
 
                 } catch (error) {
@@ -995,4 +1183,3 @@ module.exports = {
         );
     }
 };
-
